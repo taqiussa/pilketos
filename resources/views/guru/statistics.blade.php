@@ -32,6 +32,20 @@
     </nav>
 
     <div class="max-w-7xl mx-auto px-4 py-8">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <p class="text-gray-600 text-sm font-medium">Total Guru</p>
+                <p class="text-3xl font-bold text-indigo-600 mt-2">{{ $guruTotal ?? 0 }}</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <p class="text-gray-600 text-sm font-medium">Guru Sudah Voting</p>
+                <p class="text-3xl font-bold text-green-600 mt-2">{{ $guruSudahVoting ?? 0 }}</p>
+            </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <p class="text-gray-600 text-sm font-medium">Guru Belum Voting</p>
+                <p class="text-3xl font-bold text-red-600 mt-2">{{ $guruBelumVoting ?? 0 }}</p>
+            </div>
+        </div>
         <!-- Calon Putra Section -->
         <div class="mb-12">
             <h2 class="text-3xl font-bold text-blue-600 mb-6">Calon Ketua OSIS Putra</h2>

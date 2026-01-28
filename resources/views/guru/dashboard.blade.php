@@ -149,13 +149,54 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Guru Sudah Voting -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Guru yang Sudah Voting</h3>
+                <div class="flex items-end justify-between">
+                    <div>
+                        <p class="text-5xl font-bold text-green-600">{{ $guruSudahVoting ?? 0 }}</p>
+                        <p class="text-gray-600 mt-2">dari {{ $guruTotal ?? 0 }} guru</p>
+                    </div>
+                    <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center">
+                        <svg class="w-12 h-12 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                clip-rule="evenodd"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Guru Belum Voting -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">Guru yang Belum Voting</h3>
+                <div class="flex items-end justify-between">
+                    <div>
+                        <p class="text-5xl font-bold text-red-600">{{ $guruBelumVoting ?? 0 }}</p>
+                        <p class="text-gray-600 mt-2">dari {{ $guruTotal ?? 0 }} guru</p>
+                    </div>
+                    <div class="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center">
+                        <svg class="w-12 h-12 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                                clip-rule="evenodd"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- View Statistics Button -->
         <div class="text-center">
             <a href="{{ route('guru.statistics') }}"
-                class="inline-block px-8 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition">
+                class="inline-block px-8 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition mr-3">
                 Lihat Detail Hasil Voting →
+            </a>
+
+            <a href="{{ route('guru.vote') }}"
+                class="inline-block px-8 py-3 bg-amber-600 text-white rounded-lg font-semibold hover:bg-amber-700 transition">
+                Voting Sekarang →
             </a>
         </div>
     </div>

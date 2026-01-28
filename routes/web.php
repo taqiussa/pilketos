@@ -23,6 +23,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/logout', [GuruAuthController::class, 'logout'])->name('guru.logout');
     Route::get('/dashboard', [GuruDashboardController::class, 'index'])->name('guru.dashboard');
     Route::get('/statistics', [GuruDashboardController::class, 'statistics'])->name('guru.statistics');
+    Route::get('/dashboard/vote', [GuruDashboardController::class, 'showVote'])->name('guru.vote');
+    Route::post('/dashboard/vote', [GuruDashboardController::class, 'vote'])->name('guru.vote.post');
 });
 
 // require __DIR__ . '/auth.php';

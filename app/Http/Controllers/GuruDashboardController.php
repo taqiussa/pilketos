@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Calon;
 use App\Models\Siswa;
 use App\Models\Vote;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class GuruDashboardController extends Controller
@@ -28,6 +31,18 @@ class GuruDashboardController extends Controller
             ->count();
         $siswaBelumVoting = $siswaTotal - $siswaSudahVoting;
 
+        // Statistik Guru
+        $guruTotal = User::whereNull('nis')
+            ->whereNotNull('username')
+            ->where('active', true)
+            ->count();
+
+        $guruSudahVoting = Vote::whereNotNull('user_id')
+            ->whereIn('user_id', User::whereNull('nis')->whereNotNull('username')->where('active', true)->pluck('id'))
+            ->count();
+
+        $guruBelumVoting = $guruTotal - $guruSudahVoting;
+
         return view('guru.dashboard', [
             'tahunAjaran' => $tahunAjaran,
             'siswaTotal' => $siswaTotal,
@@ -35,6 +50,9 @@ class GuruDashboardController extends Controller
             'siswaPutri' => $siswaPutri,
             'siswaSudahVoting' => $siswaSudahVoting,
             'siswaBelumVoting' => $siswaBelumVoting,
+            'guruTotal' => $guruTotal,
+            'guruSudahVoting' => $guruSudahVoting,
+            'guruBelumVoting' => $guruBelumVoting,
         ]);
     }
 
@@ -54,11 +72,65 @@ class GuruDashboardController extends Controller
         $totalVotesPutra = $calonsPutra->sum('votes_count');
         $totalVotesPutri = $calonsPutri->sum('votes_count');
 
+        // Guru statistics for statistics page
+        $guruTotal = User::whereNull('nis')
+            ->whereNotNull('username')
+            ->where('active', true)
+            ->count();
+
+        $guruSudahVoting = Vote::whereNotNull('user_id')
+            ->whereIn('user_id', User::whereNull('nis')->whereNotNull('username')->where('active', true)->pluck('id'))
+            ->count();
+
+        $guruBelumVoting = $guruTotal - $guruSudahVoting;
+
         return view('guru.statistics', [
             'calonsPutra' => $calonsPutra,
             'calonsPutri' => $calonsPutri,
             'totalVotesPutra' => $totalVotesPutra,
             'totalVotesPutri' => $totalVotesPutri,
+            'guruTotal' => $guruTotal,
+            'guruSudahVoting' => $guruSudahVoting,
+            'guruBelumVoting' => $guruBelumVoting,
         ]);
+    }
+
+    public function showVote(): View
+    {
+        $calons = Calon::orderBy('jenis_kelamin')->orderBy('nomor_urut')->get();
+
+        $hasVotedGuru = Auth::check() ? Vote::where('user_id', Auth::id())->exists() : false;
+
+        return view('guru.vote', [
+            'calons' => $calons,
+            'hasVotedGuru' => $hasVotedGuru,
+        ]);
+    }
+
+    public function vote(Request $request)
+    {
+        $request->validate([
+            'calon_id' => 'required|exists:calons,id',
+        ]);
+
+        $user = Auth::user();
+
+        // ensure user is guru according to criteria
+        if (! $user || $user->nis !== null || $user->username === null || ! $user->active) {
+            abort(403);
+        }
+
+        // prevent double voting by guru
+        if (Vote::where('user_id', $user->id)->exists()) {
+            return redirect()->route('guru.dashboard')->with('error', 'Anda sudah melakukan voting.');
+        }
+
+        Vote::create([
+            'nis' => null,
+            'user_id' => $user->id,
+            'calon_id' => $request->input('calon_id'),
+        ]);
+
+        return redirect()->route('guru.dashboard')->with('success', 'Terima kasih, suara Anda telah direkam.');
     }
 }

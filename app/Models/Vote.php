@@ -11,10 +11,16 @@ class Vote extends Model
     protected $fillable = [
         'nis',
         'calon_id',
+        'user_id',
     ];
 
     public function calon(): BelongsTo
     {
         return $this->belongsTo(Calon::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 }
