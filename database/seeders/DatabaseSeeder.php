@@ -24,5 +24,8 @@ class DatabaseSeeder extends Seeder
 
         // Seed calon OSIS
         $this->call(CalonSeeder::class);
+
+        // Seed guru users
+        $this->call(GuruSeeder::class);
     }
 }

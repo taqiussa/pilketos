@@ -53,7 +53,7 @@
                                 class="h-96 bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center overflow-hidden">
                                 @if ($calon->foto_url)
                                     <img src="{{ $calon->foto_url }}" alt="{{ $calon->nama }}"
-                                        class="w-full h-full object-cover">
+                                        class="w-full h-full object-cover object-top">
                                 @else
                                     <span class="text-white text-8xl font-bold">{{ substr($calon->nama, 0, 1) }}</span>
                                 @endif
@@ -97,7 +97,7 @@
                                 class="h-96 bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center overflow-hidden">
                                 @if ($calon->foto_url)
                                     <img src="{{ $calon->foto_url }}" alt="{{ $calon->nama }}"
-                                        class="w-full h-full object-cover">
+                                        class="w-full h-full object-cover object-top">
                                 @else
                                     <span class="text-white text-8xl font-bold">{{ substr($calon->nama, 0, 1) }}</span>
                                 @endif
