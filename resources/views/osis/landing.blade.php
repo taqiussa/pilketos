@@ -9,13 +9,16 @@
 </head>
 
 <body>
-    <div class="min-h-screen bg-gradient-to-br from-indigo-600 to-purple-600">
+    <div class="min-h-screen bg-gradient-to-r from-red-600 to-red-800">
         <!-- Navigation -->
         <nav class="bg-white/10 backdrop-blur-md sticky top-0 z-50">
             <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-                <div class="text-2xl font-bold text-white">OSIS Voting</div>
+                <div class="text-2xl font-bold text-white gap-2 items-center flex">
+                    <img src="{{ asset('logo.png') }}" class=" h-12" />
+                    SMP Miftahul Huda
+                </div>
                 <a href="{{ route('osis.voting') }}"
-                    class="px-6 py-2 bg-white text-indigo-600 rounded-lg font-semibold hover:bg-gray-100 transition">
+                    class="px-6 py-2 bg-white text-red-600 rounded-lg font-semibold hover:bg-gray-100 transition">
                     Mulai Voting
                 </a>
             </div>
@@ -28,7 +31,7 @@
                     Pemilihan Ketua OSIS
                 </h1>
                 <p class="text-xl text-white/80 mb-4">
-                    Wujudkan visi Anda untuk sekolah yang lebih baik
+                    SMP Miftahul Huda Peron Limbangan
                 </p>
                 <p class="text-lg text-white/70">
                     Pilih calon pemimpin yang akan mewakili dan membawa sekolah kita ke depan
@@ -134,7 +137,7 @@
                         kita.
                     </p>
                     <a href="{{ route('osis.voting') }}"
-                        class="inline-block px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-bold text-lg hover:shadow-lg transition transform hover:scale-105">
+                        class="inline-block px-8 py-4 bg-gradient-to-r from-red-600 to-red-800 text-white rounded-lg font-bold text-lg hover:shadow-lg transition transform hover:scale-105">
                         Mulai Voting Sekarang
                     </a>
                 </div>
@@ -144,7 +147,7 @@
         <!-- Footer -->
         <footer class="bg-white/10 backdrop-blur-md border-t border-white/20 mt-16">
             <div class="max-w-6xl mx-auto px-4 py-8 text-center text-white/70">
-                <p>&copy; {{ date('Y') }} Pemilihan Ketua OSIS. Semua hak dilindungi.</p>
+                <p>&copy; {{ date('Y') }} Pemilihan Ketua OSIS | SMP Mifda Peron | Elemenka Project</p>
             </div>
         </footer>
     </div>
