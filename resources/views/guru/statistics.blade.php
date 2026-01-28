@@ -95,12 +95,12 @@
                     <div class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition">
                         <!-- Foto -->
                         <div
-                            class="h-64 bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center overflow-hidden">
+                            class="h-96 bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center overflow-hidden">
                             @if ($calon->foto_url)
                                 <img src="{{ $calon->foto_url }}" alt="{{ $calon->nama }}"
                                     class="w-full h-full object-cover object-top">
                             @else
-                                <span class="text-white text-6xl font-bold">{{ substr($calon->nama, 0, 1) }}</span>
+                                <span class="text-white text-8xl font-bold">{{ substr($calon->nama, 0, 1) }}</span>
                             @endif
                         </div>
 
