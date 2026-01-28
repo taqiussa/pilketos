@@ -72,26 +72,11 @@ class GuruDashboardController extends Controller
         $totalVotesPutra = $calonsPutra->sum('votes_count');
         $totalVotesPutri = $calonsPutri->sum('votes_count');
 
-        // Guru statistics for statistics page
-        $guruTotal = User::whereNull('nis')
-            ->whereNotNull('username')
-            ->where('active', true)
-            ->count();
-
-        $guruSudahVoting = Vote::whereNotNull('user_id')
-            ->whereIn('user_id', User::whereNull('nis')->whereNotNull('username')->where('active', true)->pluck('id'))
-            ->count();
-
-        $guruBelumVoting = $guruTotal - $guruSudahVoting;
-
         return view('guru.statistics', [
             'calonsPutra' => $calonsPutra,
             'calonsPutri' => $calonsPutri,
             'totalVotesPutra' => $totalVotesPutra,
             'totalVotesPutri' => $totalVotesPutri,
-            'guruTotal' => $guruTotal,
-            'guruSudahVoting' => $guruSudahVoting,
-            'guruBelumVoting' => $guruBelumVoting,
         ]);
     }
 
