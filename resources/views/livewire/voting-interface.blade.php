@@ -95,19 +95,22 @@
                         @forelse ($calonsTersedia as $calon)
                             <div wire:click="selectCalon({{ $calon['id'] }})"
                                 class="cursor-pointer rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all transform hover:scale-105 {{ $selectedCalonId === $calon['id'] ? 'ring-4 ring-offset-2' : '' }}"
-                                :class="{ 'ring-blue-500': '{{ $siswaJenisKelamin }}'
-                                    === 'putra', 'ring-pink-500': '{{ $siswaJenisKelamin }}'
-                                    === 'putri' }">
+                                :class="{
+                                    'ring-blue-500': '{{ $siswaJenisKelamin }}'
+                                    === 'putra',
+                                    'ring-pink-500': '{{ $siswaJenisKelamin }}'
+                                    === 'putri'
+                                }">
                                 <!-- Foto Calon -->
-                                <div class="h-80 bg-gray-300 flex items-center justify-center overflow-hidden">
+                                <div class="h-96 bg-gray-300 flex items-center justify-center overflow-hidden">
                                     @if ($calon['foto_url'])
                                         <img src="{{ $calon['foto_url'] }}" alt="{{ $calon['nama'] }}"
-                                            class="w-full h-full object-cover">
+                                            class="w-full h-full object-cover object-top">
                                     @else
                                         <div
                                             class="w-full h-full bg-gradient-to-br {{ $siswaJenisKelamin === 'putra' ? 'from-blue-400 to-blue-600' : 'from-pink-400 to-pink-600' }} flex items-center justify-center">
                                             <span
-                                                class="text-white text-6xl font-bold">{{ substr($calon['nama'], 0, 1) }}</span>
+                                                class="text-white text-8xl font-bold">{{ substr($calon['nama'], 0, 1) }}</span>
                                         </div>
                                     @endif
                                 </div>
@@ -115,9 +118,12 @@
                                 <!-- Info Calon -->
                                 <div class="p-6 bg-white">
                                     <div class="inline-block px-3 py-1 rounded-full text-sm font-semibold mb-3"
-                                        :class="{ 'bg-blue-100 text-blue-800': '{{ $siswaJenisKelamin }}'
-                                            === 'putra', 'bg-pink-100 text-pink-800': '{{ $siswaJenisKelamin }}'
-                                            === 'putri' }">
+                                        :class="{
+                                            'bg-blue-100 text-blue-800': '{{ $siswaJenisKelamin }}'
+                                            === 'putra',
+                                            'bg-pink-100 text-pink-800': '{{ $siswaJenisKelamin }}'
+                                            === 'putri'
+                                        }">
                                         No. Urut {{ $calon['nomor_urut'] }}
                                     </div>
                                     <h4 class="text-2xl font-bold text-gray-800 mb-2">{{ $calon['nama'] }}</h4>
