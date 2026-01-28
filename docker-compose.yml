@@ -1,0 +1,16 @@
+services:
+  webapp:
+    build:
+      dockerfile: Dockerfile
+    image: pilketos:latest
+    container_name: "pilketos"
+    restart: always
+    volumes:
+      - .:/var/www/html
+    networks:
+      - proxy_network  # ✅ Connect to NPM's network (internal routing)
+    ports:
+      - "8940:80"   
+networks:
+  proxy_network:
+    external: true  # ✅ Make sure this matches NPM's network
