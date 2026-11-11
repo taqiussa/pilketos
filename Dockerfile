@@ -1,96 +1,60 @@
-# Stage: Production (Apache)
-FROM php:8.4-apache
+FROM node:24-alpine AS frontend_builder
 
-# Set working directory
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+FROM php:8.4-apache AS runtime
+
 WORKDIR /var/www/html
 
-# Install system dependencies (minimal for Laravel)
-RUN apt-get update -y && \
-    apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
     unzip \
-    zip \
-    nano \
-    g++ \
-    make \
-    pkg-config \
-    autoconf \
-    build-essential \
-    ca-certificates \
-    libicu-dev \
-    libxml2-dev \
-    libxslt1-dev \
-    libzip-dev \
-    libpng-dev \
-    libsodium-dev \
-    libpq-dev \
-    libldap2-dev \
     libonig-dev \
-    ffmpeg \
-    wget \
+    && docker-php-ext-install -j"$(nproc)" \
+        mbstring \
+        pdo_mysql \
+    && a2enmod rewrite \
     && rm -rf /var/lib/apt/lists/*
 
-# Enable Apache Rewrite Module
-RUN a2enmod rewrite
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Configure and install PHP extensions
-RUN docker-php-ext-install -j$(nproc) \
-    pdo_mysql \
-    mysqli \
-    mbstring \
-    xml \
-    bcmath \
-    opcache \
-    zip \
-    fileinfo \
-    pcntl \
-    intl \
-    soap \
-    xsl \
-    exif \
-    sockets \
-    pdo_pgsql \
-    ldap
+COPY --chown=www-data:www-data . .
+COPY --chown=www-data:www-data --from=frontend_builder /app/public/build ./public/build
 
+RUN mkdir -p \
+        storage/app/public \
+        storage/framework/cache \
+        storage/framework/sessions \
+        storage/framework/views \
+        storage/logs \
+        bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache \
+    && chmod -R ug+rwX storage bootstrap/cache \
+    && composer install \
+        --no-dev \
+        --no-interaction \
+        --prefer-dist \
+        --optimize-autoloader \
+        --no-scripts \
+    && rm -f bootstrap/cache/*.php \
+    && php artisan package:discover --ansi \
+    && sed -ri 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/*.conf \
+    && printf '<Directory /var/www/html/public>\n    AllowOverride All\n    Require all granted\n</Directory>\n' > /etc/apache2/conf-available/laravel-public.conf \
+    && a2enconf laravel-public \
+    && test -f /var/www/html/public/index.php \
+    && test -f /var/www/html/public/build/manifest.json
 
-# Remove PECL extensions (imagick, memcached, redis) — NOTHING INSTALLED
+COPY healthcheck.sh /usr/local/bin/healthcheck
+RUN chmod 0755 /usr/local/bin/healthcheck
 
-# Set Apache Document Root
-ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf && \
-    sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
-
-# Optimize PHP settings + OPcache for production
-RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" && \
-    { \
-      echo "upload_max_filesize = 30M"; \
-      echo "post_max_size = 30M"; \
-      echo "max_execution_time = 600"; \
-      echo "memory_limit = 4096M"; \
-      echo ""; \
-      echo "; OPcache settings"; \
-      echo "opcache.enable=1"; \
-      echo "opcache.memory_consumption=256"; \
-      echo "opcache.interned_strings_buffer=8"; \
-      echo "opcache.max_accelerated_files=4000"; \
-      echo "opcache.revalidate_freq=2"; \
-      echo "opcache.fast_shutdown=1"; \
-      echo "opcache.validate_timestamps=1"; \
-    } >> "$PHP_INI_DIR/php.ini"
-
-# Create Laravel directories and set permissions
-RUN mkdir -p /var/www/html/storage /var/www/html/bootstrap/cache && \
-    chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache && \
-    chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
-
-# Add healthcheck script
-COPY ./healthcheck.sh /usr/local/bin/healthcheck.sh
-RUN chmod +x /usr/local/bin/healthcheck.sh
-
-# Expose port
 EXPOSE 80
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD /usr/local/bin/healthcheck.sh || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD /usr/local/bin/healthcheck || exit 1
