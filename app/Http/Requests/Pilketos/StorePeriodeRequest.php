@@ -21,6 +21,6 @@ class StorePeriodeRequest extends FormRequest
      */
     public function rules(): array
     {
-        return ['tahun' => ['required', 'regex:/^\\d{4} \\/ \\d{4}$/'], 'nama' => ['required', 'string', 'max:150'], 'status' => ['required', 'in:draft,aktif,ditutup'], 'voting_mulai' => ['nullable', 'date'], 'voting_selesai' => ['nullable', 'date', 'after_or_equal:voting_mulai'], 'hasil_publik' => ['boolean'], 'judul_landing' => ['nullable', 'string', 'max:150'], 'deskripsi_landing' => ['nullable', 'string']];
+        return ['tahun' => ['required', 'regex:/^\\d{4} \\/ \\d{4}$/', \Illuminate\Validation\Rule::unique('pilketos_periodes', 'tahun')->ignore($this->route('periode'))], 'nama' => ['required', 'string', 'max:150'], 'status' => ['required', 'in:draft,aktif,ditutup'], 'voting_mulai' => ['nullable', 'date'], 'voting_selesai' => ['nullable', 'date', 'after_or_equal:voting_mulai'], 'hasil_publik' => ['boolean'], 'judul_landing' => ['nullable', 'string', 'max:150'], 'deskripsi_landing' => ['nullable', 'string'], 'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'], 'banner' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096']];
     }
 }

@@ -73,14 +73,25 @@ class PublicVotingController extends Controller
         return view('pilketos.public.vote', compact('pasangan', 'session'));
     }
 
-    public function confirm(Request $request): View|RedirectResponse
+    public function confirm(Request $request, PilketosVotingService $voting): View|RedirectResponse
     {
         $session = $request->session()->get('pilketos.vote');
         $request->validate(['pasangan_id' => ['required', 'integer']]);
         if (! is_array($session)) {
             return redirect()->route('pilketos.landing');
         }
-        $pasangan = PilketosPasangan::query()->whereKey($request->integer('pasangan_id'))->where('kategori', $session['kategori'])->where('is_active', true)->firstOrFail();
+        $token = PilketosToken::query()->with('periode')->find($session['token_id'] ?? null);
+        if ($token === null || $token->status !== 'tersedia' || ! $voting->isOpen($token->periode)) {
+            $request->session()->forget('pilketos.vote');
+
+            return redirect()->route('pilketos.landing')->withErrors(['token' => 'Sesi voting sudah tidak berlaku.']);
+        }
+        $pasangan = PilketosPasangan::query()
+            ->whereKey($request->integer('pasangan_id'))
+            ->where('periode_id', $token->periode_id)
+            ->where('kategori', $session['kategori'])
+            ->where('is_active', true)
+            ->firstOrFail();
 
         return view('pilketos.public.confirm', compact('pasangan', 'session'));
     }

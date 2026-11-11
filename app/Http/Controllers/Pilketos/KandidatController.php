@@ -7,8 +7,11 @@ use App\Http\Requests\Pilketos\StorePasanganRequest;
 use App\Models\PilketosPasangan;
 use App\Models\PilketosPeriode;
 use App\Services\PilketosCandidateService;
+use App\Services\PilketosStudentDirectory;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class KandidatController extends Controller
@@ -35,6 +38,22 @@ class KandidatController extends Controller
         return back()->with('success', 'Pasangan kandidat ditambahkan.');
     }
 
+    public function lookup(Request $request, PilketosStudentDirectory $students): JsonResponse
+    {
+        $data = $request->validate([
+            'periode_id' => ['required', 'integer', 'exists:pilketos_periodes,id'],
+            'nis' => ['required', 'integer'],
+            'kategori' => ['required', 'in:L,P'],
+        ]);
+        $periode = PilketosPeriode::query()->findOrFail($data['periode_id']);
+
+        try {
+            return response()->json($students->eligibleStudent((int) $data['nis'], $periode->tahun, $data['kategori']));
+        } catch (\Illuminate\Validation\ValidationException) {
+            return response()->json(['message' => 'Siswa tidak memenuhi syarat untuk periode atau kategori ini.'], 422);
+        }
+    }
+
     public function destroy(PilketosPasangan $pasangan): RedirectResponse
     {
         if ($pasangan->suara()->exists()) {
@@ -43,5 +62,37 @@ class KandidatController extends Controller
         $pasangan->delete();
 
         return back()->with('success', 'Pasangan dihapus.');
+    }
+
+    public function update(StorePasanganRequest $request, PilketosPasangan $pasangan, PilketosCandidateService $candidates): RedirectResponse
+    {
+        if ($pasangan->suara()->exists() && ((int) $request->integer('ketua_nis') !== (int) $pasangan->ketua_nis || (int) $request->integer('wakil_nis') !== (int) $pasangan->wakil_nis || $request->string('kategori')->toString() !== $pasangan->kategori)) {
+            return back()->withErrors(['pasangan' => 'Identitas pasangan yang sudah menerima suara tidak dapat diubah.']);
+        }
+        $data = $request->safe()->except(['foto_ketua', 'foto_wakil', 'foto_pasangan']);
+        $obsoletePhotos = [];
+        foreach (['foto_ketua', 'foto_wakil', 'foto_pasangan'] as $field) {
+            if (! $request->hasFile($field)) {
+                continue;
+            }
+            $path = $request->file($field)->store('pilketos/kandidat', config('pilketos.photo_disk'));
+            if ($pasangan->{$field} !== null) {
+                $obsoletePhotos[] = $pasangan->{$field};
+            }
+            $data[$field] = $path;
+        }
+        $candidates->update($pasangan, $data);
+        foreach ($obsoletePhotos as $path) {
+            Storage::disk(config('pilketos.photo_disk'))->delete($path);
+        }
+
+        return back()->with('success', 'Pasangan kandidat diperbarui.');
+    }
+
+    public function toggle(Request $request, PilketosPasangan $pasangan): RedirectResponse
+    {
+        $pasangan->update(['is_active' => ! $pasangan->is_active]);
+
+        return back()->with('success', $pasangan->is_active ? 'Pasangan diaktifkan.' : 'Pasangan dinonaktifkan.');
     }
 }

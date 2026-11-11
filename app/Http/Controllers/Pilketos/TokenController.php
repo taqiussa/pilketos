@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Pilketos;
 use App\Http\Controllers\Controller;
 use App\Models\Kelas;
 use App\Models\PilketosPeriode;
+use App\Models\PilketosToken;
 use App\Services\PilketosTokenService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,8 +18,9 @@ class TokenController extends Controller
         $periodes = PilketosPeriode::query()->orderByDesc('tahun')->get();
         $periode = $periodes->firstWhere('id', $request->integer('periode')) ?? $periodes->first();
         $kelas = Kelas::query()->orderBy('tingkat')->orderBy('nama')->get();
+        $tokens = $periode ? PilketosToken::query()->where('periode_id', $periode->id)->orderByDesc('id')->paginate(25, ['*'], 'tokens')->withQueryString() : collect();
 
-        return view('pilketos.dashboard.token', compact('periodes', 'periode', 'kelas'));
+        return view('pilketos.dashboard.token', compact('periodes', 'periode', 'kelas', 'tokens'));
     }
 
     public function generate(Request $request, PilketosTokenService $tokens): RedirectResponse
@@ -29,5 +31,23 @@ class TokenController extends Controller
         $request->session()->flash('pilketos.tokens.print', $print);
 
         return redirect()->route('pilketos.token.index', ['periode' => $periode->id])->with('success', count($print).' token baru dibuat. Cetak sekarang; token plaintext tidak disimpan.');
+    }
+
+    public function replace(PilketosToken $token, PilketosTokenService $tokens): RedirectResponse
+    {
+        try {
+            $plain = $tokens->replaceUnusedToken($token->id, request()->user()?->id);
+        } catch (\RuntimeException $exception) {
+            return back()->withErrors(['token' => $exception->getMessage()]);
+        }
+
+        request()->session()->flash('pilketos.tokens.print', [[
+            'nis' => $token->nis,
+            'name' => 'Token pengganti',
+            'kelas' => 'Distribusikan langsung kepada siswa',
+            'token' => $plain,
+        ]]);
+
+        return redirect()->route('pilketos.token.index', ['periode' => $token->periode_id])->with('success', 'Token pengganti dibuat. Cetak atau distribusikan sekarang; plaintext tidak disimpan.');
     }
 }

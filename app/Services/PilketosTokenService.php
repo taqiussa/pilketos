@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\PilketosAuditLog;
 use App\Models\PilketosHakPilih;
 use App\Models\PilketosPeriode;
 use App\Models\PilketosToken;
@@ -58,6 +59,43 @@ class PilketosTokenService
         }, 3);
 
         return $printed;
+    }
+
+    public function replaceUnusedToken(int $tokenId, ?int $actorId): string
+    {
+        return DB::transaction(function () use ($tokenId, $actorId): string {
+            $token = PilketosToken::query()->lockForUpdate()->findOrFail($tokenId);
+            $hakPilih = PilketosHakPilih::query()
+                ->where('periode_id', $token->periode_id)
+                ->where('nis', $token->nis)
+                ->lockForUpdate()
+                ->first();
+            if ($token->status !== 'tersedia' || $hakPilih === null || $hakPilih->status !== 'belum_memilih') {
+                throw new RuntimeException('Token yang sudah digunakan atau tidak aktif tidak dapat diganti.');
+            }
+
+            for ($attempt = 0; $attempt < config('pilketos.max_token_attempts'); $attempt++) {
+                $plain = $this->randomToken();
+                try {
+                    $token->update(['token_hash' => $this->hash($plain), 'generated_by' => $actorId]);
+                    PilketosAuditLog::query()->create([
+                        'periode_id' => $token->periode_id,
+                        'nis' => $token->nis,
+                        'actor_id' => $actorId,
+                        'event' => 'token_diganti',
+                        'context' => ['token_id' => $token->id],
+                    ]);
+
+                    return $plain;
+                } catch (QueryException $exception) {
+                    if (! $this->isUniqueViolation($exception)) {
+                        throw $exception;
+                    }
+                }
+            }
+
+            throw new RuntimeException('Token pengganti aman tidak dapat dibuat. Coba lagi.');
+        }, 3);
     }
 
     private function createToken(int $periodeId, int $nis, int $kelasId, ?int $actorId): string
