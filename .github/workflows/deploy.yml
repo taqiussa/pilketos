@@ -206,14 +206,9 @@ jobs:
             PREVIOUS_TASK_IMAGES["$SERVICE"]="$(get_running_task_image "$SERVICE")"
             PREVIOUS_TASK_STATES["$SERVICE"]="$(get_running_task_state "$SERVICE")"
 
-            if [ -z "${PREVIOUS_TASK_IDS[$SERVICE]}" ]; then
-              echo "ERROR: No running task for $SERVICE"
-              exit 1
-            fi
-
-            if [[ "${PREVIOUS_TASK_STATES[$SERVICE]}" != Running* ]]; then
-              echo "ERROR: Previous task is not Running: $SERVICE"
-              exit 1
+            if [ -z "${PREVIOUS_TASK_IDS[$SERVICE]}" ] ||
+               [[ "${PREVIOUS_TASK_STATES[$SERVICE]}" != Running* ]]; then
+              echo "WARNING: No healthy task is currently running for $SERVICE; continuing with recovery deployment."
             fi
 
             if [ -z "${PREVIOUS_DIGESTS[$SERVICE]}" ] ||
