@@ -1,27 +1,27 @@
 <?php
 
 use App\Http\Controllers\GuruAuthController;
-use App\Http\Controllers\Pilketos\DashboardController;
 use App\Http\Controllers\Pilketos\HasilController;
 use App\Http\Controllers\Pilketos\KandidatController;
-use App\Http\Controllers\Pilketos\PemilihController;
 use App\Http\Controllers\Pilketos\PengaturanController;
+use App\Http\Controllers\Pilketos\PresignPasanganPhotoController;
 use App\Http\Controllers\Pilketos\PublicVotingController;
 use App\Http\Controllers\Pilketos\TokenController;
 use Illuminate\Support\Facades\Route;
+use Livewire\Volt\Volt;
 
 Route::get('/health', function () {
     return response()->json(['status' => 'ok']);
 });
 
 // Routes untuk OSIS Voting - Landing Page
-Route::get('/', [PublicVotingController::class, 'landing'])->name('pilketos.landing');
+Volt::route('/', 'pages.pilketos.landing')->name('pilketos.landing');
 Route::post('/verifikasi-token', [PublicVotingController::class, 'verify'])->middleware('throttle:pilketos-token')->name('pilketos.verify');
-Route::get('/voting', [PublicVotingController::class, 'vote'])->name('pilketos.vote');
-Route::post('/voting/konfirmasi', [PublicVotingController::class, 'confirm'])->name('pilketos.confirm');
+Volt::route('/voting', 'pages.pilketos.vote')->name('pilketos.vote');
+Volt::route('/voting/konfirmasi', 'pages.pilketos.confirm')->name('pilketos.confirm');
 Route::post('/voting/kirim', [PublicVotingController::class, 'submit'])->name('pilketos.submit');
-Route::get('/voting/selesai', [PublicVotingController::class, 'done'])->name('pilketos.done');
-Route::get('/hasil', [HasilController::class, 'public'])->name('pilketos.hasil.public');
+Volt::route('/voting/selesai', 'pages.pilketos.done')->name('pilketos.done');
+Volt::route('/hasil', 'pages.pilketos.public-results')->name('pilketos.hasil.public');
 
 // Routes untuk Guru Login dan Dashboard
 Route::middleware('guest')->group(function () {
@@ -31,20 +31,21 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth:web')->group(function () {
     Route::post('/logout', [GuruAuthController::class, 'logout'])->name('guru.logout');
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('guru.dashboard');
-    Route::get('/dashboard/kandidat', [KandidatController::class, 'index'])->name('pilketos.kandidat.index');
+    Volt::route('/dashboard', 'pages.pilketos.dashboard')->name('guru.dashboard');
+    Volt::route('/dashboard/kandidat', 'pages.pilketos.candidates')->name('pilketos.kandidat.index');
     Route::get('/dashboard/kandidat/siswa', [KandidatController::class, 'lookup'])->name('pilketos.kandidat.lookup');
+    Route::post('/dashboard/kandidat/foto/presign', PresignPasanganPhotoController::class)->name('pilketos.kandidat.photo.presign');
     Route::post('/dashboard/kandidat', [KandidatController::class, 'store'])->name('pilketos.kandidat.store');
     Route::put('/dashboard/kandidat/{pasangan}', [KandidatController::class, 'update'])->name('pilketos.kandidat.update');
     Route::patch('/dashboard/kandidat/{pasangan}/status', [KandidatController::class, 'toggle'])->name('pilketos.kandidat.toggle');
     Route::delete('/dashboard/kandidat/{pasangan}', [KandidatController::class, 'destroy'])->name('pilketos.kandidat.destroy');
-    Route::get('/dashboard/token', [TokenController::class, 'index'])->name('pilketos.token.index');
+    Volt::route('/dashboard/token', 'pages.pilketos.tokens')->name('pilketos.token.index');
     Route::post('/dashboard/token', [TokenController::class, 'generate'])->name('pilketos.token.generate');
     Route::post('/dashboard/token/{token}/replace', [TokenController::class, 'replace'])->name('pilketos.token.replace');
-    Route::get('/dashboard/pemilih', [PemilihController::class, 'index'])->name('pilketos.pemilih.index');
-    Route::get('/dashboard/hasil', [HasilController::class, 'index'])->name('pilketos.hasil.index');
+    Volt::route('/dashboard/pemilih', 'pages.pilketos.voters')->name('pilketos.pemilih.index');
+    Volt::route('/dashboard/hasil', 'pages.pilketos.results')->name('pilketos.hasil.index');
     Route::get('/dashboard/hasil/{periode}/pdf', [HasilController::class, 'pdf'])->name('pilketos.hasil.pdf');
-    Route::get('/dashboard/pengaturan', [PengaturanController::class, 'index'])->name('pilketos.pengaturan.index');
+    Volt::route('/dashboard/pengaturan', 'pages.pilketos.settings')->name('pilketos.pengaturan.index');
     Route::post('/dashboard/pengaturan', [PengaturanController::class, 'store'])->name('pilketos.pengaturan.store');
     Route::put('/dashboard/pengaturan/{periode}', [PengaturanController::class, 'update'])->name('pilketos.pengaturan.update');
     Route::delete('/dashboard/pengaturan/{periode}', [PengaturanController::class, 'destroy'])->name('pilketos.pengaturan.destroy');

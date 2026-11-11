@@ -8,6 +8,7 @@ use App\Models\PilketosPeriode;
 use App\Models\PilketosSuara;
 use App\Models\PilketosToken;
 use App\Services\PilketosCandidateService;
+use App\Services\PilketosStudentDirectory;
 use App\Services\PilketosTokenService;
 use App\Services\PilketosVotingService;
 use Illuminate\Database\Schema\Blueprint;
@@ -131,6 +132,30 @@ it('pembaruan kandidat menolak siswa yang sudah menjadi kandidat lain', function
     $second = $service->create(['periode_id' => $periode->id, 'kategori' => 'L', 'nomor_urut' => 2, 'ketua_nis' => 100003, 'wakil_nis' => 100004]);
 
     expect(fn () => $service->update($second, ['periode_id' => $periode->id, 'kategori' => 'L', 'nomor_urut' => 2, 'ketua_nis' => $first->ketua_nis, 'wakil_nis' => 100004]))->toThrow(ValidationException::class);
+});
+
+it('direktori kandidat hanya mengembalikan siswa pada tahun dan jenis kelamin yang dipilih', function (): void {
+    ($this->createEligibleStudent)(100001, 'L');
+    ($this->createEligibleStudent)(100002, 'P');
+    \Illuminate\Support\Facades\DB::table('user_siswa')->where('nis', 100002)->update(['name' => 'Siswa Putri']);
+    \Illuminate\Support\Facades\DB::table('siswas')->insert(['nis' => 100003, 'kelas_id' => 1, 'tahun' => '2025 / 2026']);
+    \Illuminate\Support\Facades\DB::table('user_siswa')->insert(['nis' => 100003, 'name' => 'Siswa Lama']);
+    \Illuminate\Support\Facades\DB::table('biodata')->insert(['nis' => 100003, 'jenis_kelamin' => 'L']);
+
+    $students = app(PilketosStudentDirectory::class)->eligibleStudents('2026 / 2027', 'L');
+
+    expect($students)->toHaveCount(1)
+        ->and($students[0])->toMatchArray(['nis' => 100001, 'name' => 'Siswa Uji', 'kelas' => '8 A', 'kategori' => 'L']);
+});
+
+it('validasi kandidat menolak siswa dari jenis kelamin atau tahun yang berbeda', function (): void {
+    ($this->createEligibleStudent)(100001, 'L');
+    ($this->createEligibleStudent)(100002, 'P');
+    $periode = PilketosPeriode::query()->create(['tahun' => '2026 / 2027', 'nama' => 'PILKETOS', 'status' => 'draft']);
+
+    expect(fn () => app(PilketosCandidateService::class)->create([
+        'periode_id' => $periode->id, 'kategori' => 'L', 'nomor_urut' => 1, 'ketua_nis' => 100001, 'wakil_nis' => 100002,
+    ]))->toThrow(ValidationException::class);
 });
 
 it('hasil publik hanya dapat diakses ketika periode dipublikasikan', function (): void {

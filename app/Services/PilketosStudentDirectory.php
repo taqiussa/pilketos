@@ -10,6 +10,32 @@ use Illuminate\Validation\ValidationException;
 
 class PilketosStudentDirectory
 {
+    /** @return list<array{nis: int, name: string, kelas_id: int, kelas: string, kategori: string}> */
+    public function eligibleStudents(string $tahun, string $kategori): array
+    {
+        return Siswa::query()
+            ->join('user_siswa', 'user_siswa.nis', '=', 'siswas.nis')
+            ->join('biodata', 'biodata.nis', '=', 'siswas.nis')
+            ->join('kelas', 'kelas.id', '=', 'siswas.kelas_id')
+            ->where('siswas.tahun', $tahun)
+            ->where('biodata.jenis_kelamin', $kategori)
+            ->orderBy('user_siswa.name')
+            ->orderBy('siswas.nis')
+            ->get([
+                'siswas.nis', 'siswas.kelas_id', 'user_siswa.name', 'biodata.jenis_kelamin as kategori',
+                'kelas.tingkat', 'kelas.nama as nama_kelas',
+            ])
+            ->map(fn ($student): array => [
+                'nis' => (int) $student->nis,
+                'name' => $student->name,
+                'kelas_id' => (int) $student->kelas_id,
+                'kelas' => trim($student->tingkat.' '.$student->nama_kelas),
+                'kategori' => $student->kategori,
+            ])
+            ->values()
+            ->all();
+    }
+
     /** @return array{nis: int, name: string, kelas_id: int, kelas: string, kategori: string} */
     public function eligibleStudent(int $nis, string $tahun, ?string $kategori = null): array
     {
