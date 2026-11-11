@@ -1,7 +1,6 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -11,15 +10,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('calons', function (Blueprint $table) {
-            $table->id();
-            $table->string('nama');
-            $table->enum('jenis_kelamin', ['putra', 'putri']);
-            $table->integer('nomor_urut');
-            $table->text('foto_url')->nullable();
-            $table->text('deskripsi')->nullable();
-            $table->timestamps();
-        });
+        // Legacy PILKETOS schema is deliberately baselined and never created.
     }
 
     /**
@@ -27,6 +18,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('calons');
+        // No-op; never delete legacy or shared data.
     }
 };

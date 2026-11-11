@@ -1,17 +1,24 @@
 <?php
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    $this->withoutVite();
+});
+
 it('landing page osis dapat diakses', function () {
     $response = $this->get('/');
 
     $response->assertStatus(200);
-    $response->assertSee('Pemilihan Ketua OSIS');
+    $response->assertSee('SMP Al Musyaffa');
 });
 
 it('voting page dapat diakses', function () {
     $response = $this->get('/voting');
 
-    $response->assertStatus(200);
-    $response->assertViewIs('osis.voting');
+    $response->assertRedirect(route('pilketos.landing'));
 });
 
 it('siswa dapat melakukan voting setelah verifikasi nis')->skip('Database structure required for full integration test');

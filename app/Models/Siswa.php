@@ -36,12 +36,4 @@ class Siswa extends Model
     {
         return $this->belongsTo(User::class, 'nis', 'nis')->withDefault();
     }
-
-    /**
-     * Get the vote that owns the Siswa
-     */
-    public function vote(): HasOne
-    {
-        return $this->hasOne(Vote::class, 'nis', 'nis');
-    }
 }
