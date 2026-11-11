@@ -13,7 +13,7 @@
     <nav class="bg-white shadow">
         <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
             <div class="text-2xl font-bold text-indigo-600">OSIS Voting</div>
-            <a href="{{ route('osis.landing') }}" class="text-gray-600 hover:text-indigo-600 transition">
+            <a href="{{ route('pilketos.landing') }}" class="text-gray-600 hover:text-indigo-600 transition">
                 ← Kembali ke Landing Page
             </a>
         </div>

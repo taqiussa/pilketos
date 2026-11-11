@@ -17,7 +17,7 @@
                     <img src="{{ asset('logo.png') }}" class=" h-12" />
                     SMP Miftahul Huda
                 </div>
-                <a href="{{ route('osis.voting') }}"
+                <a href="{{ route('pilketos.vote') }}"
                     class="px-6 py-2 bg-white text-red-600 rounded-lg font-semibold hover:bg-gray-100 transition">
                     Mulai Voting
                 </a>
@@ -136,7 +136,7 @@
                         Setiap suara Anda sangat berharga. Mari bersama memilih pemimpin yang terbaik untuk sekolah
                         kita.
                     </p>
-                    <a href="{{ route('osis.voting') }}"
+                    <a href="{{ route('pilketos.vote') }}"
                         class="inline-block px-8 py-4 bg-gradient-to-r from-red-600 to-red-800 text-white rounded-lg font-bold text-lg hover:shadow-lg transition transform hover:scale-105">
                         Mulai Voting Sekarang
                     </a>

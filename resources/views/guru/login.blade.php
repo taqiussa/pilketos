@@ -54,7 +54,7 @@
 
             <!-- Back Link -->
             <div class="text-center mt-6">
-                <a href="{{ route('osis.landing') }}" class="text-indigo-600 hover:text-indigo-700 font-medium">
+                <a href="{{ route('pilketos.landing') }}" class="text-indigo-600 hover:text-indigo-700 font-medium">
                     ← Kembali ke Halaman Utama
                 </a>
             </div>
