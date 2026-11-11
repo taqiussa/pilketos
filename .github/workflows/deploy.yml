@@ -1,0 +1,427 @@
+
+name: PILKETOS - Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smpalfa-pemilos-deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and Push Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    outputs:
+      digest: ${{ steps.build-image.outputs.digest }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push image
+        id: build-image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          pull: true
+          no-cache: true
+          tags: taqiussa/smpalfa:pemilos
+
+  deploy:
+    name: Deploy Docker Swarm
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:github-actions
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          printf '%s\n' "$SSH_PRIVATE_KEY" \
+            > ~/.ssh/github_actions
+          chmod 600 ~/.ssh/github_actions
+
+          test -n "$SSH_KNOWN_HOSTS"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" \
+            > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy and verify services
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          IMAGE_DIGEST: ${{ needs.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+
+          IMAGE="taqiussa/smpalfa:pemilos"
+          IMMUTABLE="taqiussa/smpalfa@${IMAGE_DIGEST}"
+
+          if [[ ! "$IMAGE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "ERROR: Invalid image digest"
+            exit 1
+          fi
+
+          ssh \
+            -i ~/.ssh/github_actions \
+            -o IdentitiesOnly=yes \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            -p 1817 \
+            "$SSH_USER@$SSH_HOST" \
+            bash -s -- "$IMAGE" "$IMMUTABLE" <<'REMOTE'
+          set -euo pipefail
+
+          IMAGE="$1"
+          IMMUTABLE="$2"
+
+          SERVICES=(
+            "smpalfa_pemilos"
+          )
+
+          declare -A PREVIOUS_IMAGES
+          declare -A PREVIOUS_DIGESTS
+          declare -A PREVIOUS_TASK_IDS
+          declare -A PREVIOUS_TASK_IMAGES
+          declare -A PREVIOUS_TASK_STATES
+          declare -A PREVIOUS_REPLICAS
+
+          UPDATED_SERVICES=()
+
+          get_running_task_id() {
+            local service="$1"
+
+            docker service ps "$service" \
+              --filter desired-state=running \
+              --format '{{.ID}}' \
+              | head -n 1
+          }
+
+          get_running_task_state() {
+            local service="$1"
+
+            docker service ps "$service" \
+              --filter desired-state=running \
+              --format '{{.CurrentState}}' \
+              | head -n 1
+          }
+
+          get_running_task_image() {
+            local service="$1"
+
+            docker service ps "$service" \
+              --filter desired-state=running \
+              --format '{{.Image}}' \
+              | head -n 1
+          }
+
+          get_running_task_count() {
+            local service="$1"
+
+            docker service ps "$service" \
+              --filter desired-state=running \
+              --format '{{.ID}}' \
+              | grep -c . || true
+          }
+
+          get_update_state() {
+            local service="$1"
+
+            docker service inspect "$service" \
+              --format '{{if .UpdateStatus}}{{.UpdateStatus.State}}{{end}}'
+          }
+
+          get_service_image() {
+            local service="$1"
+
+            docker service inspect "$service" \
+              --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}'
+          }
+
+          get_service_digest_label() {
+            local service="$1"
+
+            docker service inspect "$service" \
+              --format '{{index .Spec.Labels "deploy.image-digest"}}'
+          }
+
+          echo "Checking services..."
+
+          for SERVICE in "${SERVICES[@]}"; do
+            if ! docker service inspect "$SERVICE" >/dev/null 2>&1; then
+              echo "ERROR: Service does not exist: $SERVICE"
+              exit 1
+            fi
+
+            REPLICAS="$(
+              docker service inspect "$SERVICE" \
+                --format '{{.Spec.Mode.Replicated.Replicas}}'
+            )"
+
+            if [ "$REPLICAS" != "1" ]; then
+              echo "ERROR: Expected one replica: $SERVICE"
+              exit 1
+            fi
+
+            PREVIOUS_REPLICAS["$SERVICE"]="$REPLICAS"
+            PREVIOUS_IMAGES["$SERVICE"]="$(get_service_image "$SERVICE")"
+            PREVIOUS_DIGESTS["$SERVICE"]="$(get_service_digest_label "$SERVICE")"
+            PREVIOUS_TASK_IDS["$SERVICE"]="$(get_running_task_id "$SERVICE")"
+            PREVIOUS_TASK_IMAGES["$SERVICE"]="$(get_running_task_image "$SERVICE")"
+            PREVIOUS_TASK_STATES["$SERVICE"]="$(get_running_task_state "$SERVICE")"
+
+            if [ -z "${PREVIOUS_TASK_IDS[$SERVICE]}" ]; then
+              echo "ERROR: No running task for $SERVICE"
+              exit 1
+            fi
+
+            if [[ "${PREVIOUS_TASK_STATES[$SERVICE]}" != Running* ]]; then
+              echo "ERROR: Previous task is not Running: $SERVICE"
+              exit 1
+            fi
+
+            if [ -z "${PREVIOUS_DIGESTS[$SERVICE]}" ] ||
+               [ "${PREVIOUS_DIGESTS[$SERVICE]}" = "<no value>" ]; then
+              PREVIOUS_DIGESTS["$SERVICE"]=""
+            fi
+
+            echo "Service: $SERVICE"
+            echo "Previous image: ${PREVIOUS_IMAGES[$SERVICE]}"
+            echo "Previous digest: ${PREVIOUS_DIGESTS[$SERVICE]}"
+            echo "Previous task: ${PREVIOUS_TASK_IDS[$SERVICE]}"
+          done
+
+          echo "Pulling exact image: $IMMUTABLE"
+          docker pull "$IMMUTABLE"
+
+          echo "Tagging image: $IMAGE"
+          docker tag "$IMMUTABLE" "$IMAGE"
+
+          rollback_services() {
+            echo "Deployment failed. Rolling back affected services..."
+
+            local failed=0
+            local service
+            local old_image
+            local old_digest
+
+            for ((i=${#UPDATED_SERVICES[@]}-1; i>=0; i--)); do
+              service="${UPDATED_SERVICES[$i]}"
+              old_image="${PREVIOUS_IMAGES[$service]}"
+              old_digest="${PREVIOUS_DIGESTS[$service]}"
+
+              echo "Rolling back $service"
+
+              if [[ "$old_digest" == *@sha256:* ]]; then
+                echo "Previous immutable image: $old_digest"
+
+                if ! docker pull "$old_digest"; then
+                  echo "ERROR: Cannot pull previous image for $service"
+                  failed=1
+                  continue
+                fi
+
+                docker tag "$old_digest" "$IMAGE"
+
+                if ! docker service update \
+                  --image "$IMAGE" \
+                  --no-resolve-image \
+                  --force \
+                  --label-add "deploy.image-digest=$old_digest" \
+                  --update-parallelism 1 \
+                  --update-delay 10s \
+                  --update-order start-first \
+                  --update-failure-action rollback \
+                  --update-monitor 10s \
+                  --detach=false \
+                  "$service"; then
+                  echo "ERROR: Rollback update failed: $service"
+                  failed=1
+                fi
+              else
+                echo "WARNING: No previous immutable digest for $service"
+                echo "Cannot guarantee exact previous image restoration."
+                failed=1
+              fi
+            done
+
+            if [ "$failed" -ne 0 ]; then
+              echo "ERROR: One or more services could not be safely restored"
+            fi
+
+            exit 1
+          }
+
+          check_deployment() {
+            local service="$1"
+            local old_task_id="$2"
+
+            local update_state
+            local task_id
+            local task_state
+            local task_image
+            local service_image
+            local running_count
+
+            echo "Checking Swarm deployment: $service"
+
+            for ATTEMPT in $(seq 1 24); do
+              update_state="$(get_update_state "$service")"
+              task_id="$(get_running_task_id "$service")"
+              task_state="$(get_running_task_state "$service")"
+              task_image="$(get_running_task_image "$service")"
+              service_image="$(get_service_image "$service")"
+              running_count="$(get_running_task_count "$service")"
+
+              echo "$service: attempt=$ATTEMPT/24"
+              echo "  update=$update_state"
+              echo "  task=$task_id"
+              echo "  state=$task_state"
+              echo "  task_image=$task_image"
+              echo "  service_image=$service_image"
+              echo "  running_tasks=$running_count"
+
+              case "$update_state" in
+                paused|rollback_started|rollback_paused|rollback_completed)
+                  echo "ERROR: Swarm update failed: $update_state"
+                  return 1
+                  ;;
+              esac
+
+              if [ "$service_image" != "$IMAGE" ]; then
+                echo "ERROR: Unexpected service image: $service_image"
+                return 1
+              fi
+
+              if [ "$task_id" = "$old_task_id" ]; then
+                echo "Waiting for replacement task..."
+                sleep 10
+                continue
+              fi
+
+              if [ -z "$task_id" ]; then
+                echo "Waiting for new task..."
+                sleep 10
+                continue
+              fi
+
+              if [[ "$task_state" != Running* ]]; then
+                echo "Waiting for task to reach Running..."
+                sleep 10
+                continue
+              fi
+
+              if [ "$task_image" != "$IMAGE" ]; then
+                echo "ERROR: Unexpected task image: $task_image"
+                return 1
+              fi
+
+              if [ "$running_count" != "1" ]; then
+                echo "Waiting for exactly one running task..."
+                sleep 10
+                continue
+              fi
+
+              if [ -n "$update_state" ] &&
+                 [ "$update_state" != "completed" ]; then
+                echo "Waiting for update completion..."
+                sleep 10
+                continue
+              fi
+
+              echo "New task verified: $task_id"
+              return 0
+            done
+
+            echo "ERROR: Deployment verification timeout: $service"
+            return 1
+          }
+
+          for SERVICE in "${SERVICES[@]}"; do
+            echo "Updating $SERVICE"
+
+            OLD_TASK_ID="${PREVIOUS_TASK_IDS[$SERVICE]}"
+
+            UPDATED_SERVICES+=("$SERVICE")
+
+            if ! docker service update \
+              --image "$IMAGE" \
+              --no-resolve-image \
+              --force \
+              --label-add "deploy.image-digest=$IMMUTABLE" \
+              --update-parallelism 1 \
+              --update-delay 10s \
+              --update-order start-first \
+              --update-failure-action rollback \
+              --update-monitor 10s \
+              --detach=false \
+              "$SERVICE"; then
+              rollback_services
+            fi
+
+            if ! check_deployment "$SERVICE" "$OLD_TASK_ID"; then
+              rollback_services
+            fi
+
+            SERVICE_IMAGE="$(get_service_image "$SERVICE")"
+
+            if [ "$SERVICE_IMAGE" != "$IMAGE" ]; then
+              echo "ERROR: $SERVICE image is $SERVICE_IMAGE, expected $IMAGE"
+              rollback_services
+            fi
+
+            echo "$SERVICE deployed successfully"
+          done
+
+          echo "Final Laravel service status:"
+
+          for SERVICE in "${SERVICES[@]}"; do
+            SERVICE_ID="$(
+              docker service inspect "$SERVICE" \
+                --format '{{.ID}}'
+            )"
+
+            docker service ls --filter "id=$SERVICE_ID"
+
+            echo "Image: $(get_service_image "$SERVICE")"
+            echo "Digest metadata: $(get_service_digest_label "$SERVICE")"
+          done
+
+          echo "Deployment completed successfully"
+          REMOTE
