@@ -170,12 +170,14 @@ new #[Layout('layouts.pilketos')] class extends Component {
                 const presign = await response.json();
                 if (! response.ok) throw new Error(Object.values(presign.errors ?? {}).flat().join(' ') || presign.message || 'Upload tidak dapat dipersiapkan.');
                 this.photoStatus = 'Mengunggah foto...';
-                const upload = await fetch(presign.upload_url, {method: 'PUT', headers: {'Content-Type': presign.content_type}, body: blob});
-                if (! upload.ok) throw new Error('Foto tidak dapat diunggah ke penyimpanan.');
+                const upload = await fetch(presign.upload_url, {method: 'PUT', headers: presign.upload_headers, body: blob});
+                if (! upload.ok) throw new Error(`Foto tidak dapat diunggah ke penyimpanan (${upload.status}). Pastikan CORS bucket mengizinkan PUT serta header Content-Type dan x-amz-acl.`);
                 await $wire.set('fotoPasangan', presign.object_key);
                 this.photoStatus = 'Foto siap disimpan.';
             } catch (error) {
-                this.photoError = error.message || 'Upload foto gagal.';
+                this.photoError = error instanceof TypeError
+                    ? 'Koneksi ke penyimpanan ditolak. Periksa CORS bucket untuk PUT serta header Content-Type dan x-amz-acl.'
+                    : (error.message || 'Upload foto gagal.');
                 this.previewUrl = '';
                 await $wire.set('fotoPasangan', '');
                 event.target.value = '';

@@ -10,6 +10,7 @@ use App\Models\PilketosSuara;
 use App\Models\PilketosToken;
 use App\Models\User;
 use App\Services\PilketosCandidateService;
+use App\Services\PilketosPhotoUploadService;
 use App\Services\PilketosStudentDirectory;
 use App\Services\PilketosTokenClassReportService;
 use App\Services\PilketosTokenService;
@@ -116,6 +117,14 @@ it('halaman masukkan token dapat diakses publik', function (): void {
     $this->get(route('pilketos.enter-token'))->assertSuccessful()
         ->assertSee('Masukkan Token Voting')
         ->assertSee('Mulai Memilih');
+});
+
+it('foto pasangan baru menggunakan prefix bucket SMP dan foto lama tetap terbaca', function (): void {
+    $pasangan = new PilketosPasangan(['foto_pasangan' => 'pilketos/pasangan-kandidat/foto-lama.webp']);
+
+    expect(PilketosPhotoUploadService::PREFIX)->toBe('smp/pilketos/pasangan-kandidat/')
+        ->and($pasangan->photoPath())->toBe('pilketos/pasangan-kandidat/foto-lama.webp')
+        ->and(config('filesystems.disks.s3.use_path_style_endpoint'))->toBeTrue();
 });
 
 it('siswa dapat melakukan voting dengan token yang valid', function (): void {

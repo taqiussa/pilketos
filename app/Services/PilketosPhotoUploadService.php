@@ -10,11 +10,11 @@ use Illuminate\Validation\ValidationException;
 
 class PilketosPhotoUploadService
 {
-    public const PREFIX = 'pilketos/pasangan-kandidat/';
+    public const PREFIX = 'smp/pilketos/pasangan-kandidat/';
 
     public const MAX_BYTES = 10_485_760;
 
-    /** @return array{upload_url: string, object_key: string, content_type: string} */
+    /** @return array{upload_url: string, object_key: string, content_type: string, upload_headers: array{Content-Type: string, x-amz-acl: string}} */
     public function presign(Authenticatable $user, int $size): array
     {
         $key = self::PREFIX.Str::uuid().'.webp';
@@ -36,7 +36,12 @@ class PilketosPhotoUploadService
             'expires_at' => now()->addMinutes(5),
         ]);
 
-        return ['upload_url' => (string) $request->getUri(), 'object_key' => $key, 'content_type' => 'image/webp'];
+        return [
+            'upload_url' => (string) $request->getUri(),
+            'object_key' => $key,
+            'content_type' => 'image/webp',
+            'upload_headers' => ['Content-Type' => 'image/webp', 'x-amz-acl' => 'public-read'],
+        ];
     }
 
     public function verifyFor(Authenticatable $user, string $key): PilketosPhotoUpload

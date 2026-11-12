@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $title ?? 'PILKETOS SMP Al Musyaffa' }}</title>
+    <link rel="icon" href="https://is3.cloudhost.id/alfa/smp/public/logoalfa.png">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-slate-50 text-slate-900 antialiased">

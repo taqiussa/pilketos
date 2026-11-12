@@ -6,6 +6,7 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
         <title>{{ config('app.name', 'Laravel') }}</title>
+        <link rel="icon" href="https://is3.cloudhost.id/alfa/smp/public/logoalfa.png">
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">

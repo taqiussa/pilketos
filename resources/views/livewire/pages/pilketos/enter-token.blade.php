@@ -3,7 +3,6 @@
 use App\Models\PilketosPeriode;
 use App\Services\PilketosTokenVerificationService;
 use App\Services\PilketosVotingService;
-use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 
@@ -17,7 +16,7 @@ new #[Layout('components.pilketos.public.layout')] class extends Component {
     {
         $this->periode = PilketosPeriode::query()->where('status', 'aktif')->latest('id')->first();
         $this->votingOpen = $this->periode !== null && $voting->isOpen($this->periode);
-        $this->logoUrl = $this->periode?->logo_path ? Storage::disk(config('pilketos.photo_disk'))->url($this->periode->logo_path) : null;
+        $this->logoUrl = 'https://is3.cloudhost.id/alfa/smp/public/logoalfa.png';
     }
 
     public function verify(PilketosTokenVerificationService $verification): void
