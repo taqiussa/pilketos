@@ -1,9 +1,9 @@
 @props(['pasangan', 'profile', 'showDetails' => true])
 
 <article {{ $attributes->merge(['class' => 'overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_45px_-30px_rgba(15,23,42,.42)]']) }}>
-    <div class="relative aspect-[16/9] bg-slate-100">
+    <div class="relative aspect-[4/3] bg-slate-100 sm:aspect-[16/10]">
         @if ($pasangan->photoUrl())
-            <img src="{{ $pasangan->photoUrl() }}" alt="Foto pasangan calon nomor {{ $pasangan->nomor_urut }}" class="h-full w-full object-cover" loading="lazy">
+            <img src="{{ $pasangan->photoUrl() }}" alt="Foto pasangan calon nomor {{ $pasangan->nomor_urut }}" class="h-full w-full object-cover object-[center_15%]" loading="lazy">
         @else
             <div class="flex h-full items-center justify-center bg-gradient-to-br from-emerald-50 to-slate-100 text-sm font-bold text-slate-500">Foto pasangan belum tersedia</div>
         @endif

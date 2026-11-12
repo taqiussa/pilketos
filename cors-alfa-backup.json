@@ -1,0 +1,43 @@
+{
+    "CORSRules": [
+        {
+            "ID": "SiakadDirectUpload",
+            "AllowedHeaders": [
+                "*"
+            ],
+            "AllowedMethods": [
+                "GET",
+                "PUT",
+                "HEAD"
+            ],
+            "AllowedOrigins": [
+                "https://pilketos.smpalmusyaffa.sch.id",
+                "https://siakad.smpalmusyaffa.sch.id"
+            ],
+            "ExposeHeaders": [
+                "ETag"
+            ],
+            "MaxAgeSeconds": 3600
+        },
+        {
+            "ID": "CloudConsoleWebUIRule",
+            "AllowedHeaders": [
+                "*"
+            ],
+            "AllowedMethods": [
+                "GET",
+                "PUT",
+                "DELETE",
+                "HEAD",
+                "POST"
+            ],
+            "AllowedOrigins": [
+                "https://console.idcloudhost.com"
+            ],
+            "ExposeHeaders": [
+                "ETag"
+            ],
+            "MaxAgeSeconds": 3000
+        }
+    ]
+}

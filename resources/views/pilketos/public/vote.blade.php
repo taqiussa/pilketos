@@ -1,3 +1,24 @@
 <x-pilketos.public.layout title="Pilih pasangan">
-    <div class="rounded-3xl bg-white p-6 shadow-2xl sm:p-10"><p class="text-sm font-bold uppercase tracking-widest text-emerald-700">Pilih pasangan calon</p><h1 class="mt-2 text-3xl font-black">Kategori {{ $session['kategori'] === 'L' ? 'Putra' : 'Putri' }}</h1><div class="mt-8 grid gap-5 md:grid-cols-2">@forelse($pasangan as $item)<article class="overflow-hidden rounded-2xl border border-slate-200 p-5">@if($item->photoUrl())<img src="{{ $item->photoUrl() }}" class="mb-4 h-48 w-full rounded-xl object-cover" alt="Foto pasangan nomor {{ $item->nomor_urut }}">@endif<span class="rounded-full bg-emerald-100 px-3 py-1 text-sm font-black text-emerald-800">No. {{ $item->nomor_urut }}</span><h2 class="mt-4 text-xl font-black">Pasangan {{ $item->nomor_urut }}</h2><p class="mt-2 text-slate-600">Visi: {{ $item->visi ?: 'Belum tersedia' }}</p><form class="mt-5" method="POST" action="{{ route('pilketos.confirm') }}">@csrf<input type="hidden" name="pasangan_id" value="{{ $item->id }}"><button class="rounded-xl bg-slate-900 px-4 py-2 font-bold text-white">Pilih pasangan ini</button></form></article>@empty<p class="text-slate-600">Belum ada pasangan aktif.</p>@endforelse</div></div>
+    <div class="rounded-3xl bg-white p-6 shadow-2xl sm:p-10">
+        <p class="text-sm font-bold uppercase tracking-widest text-emerald-700">Pilih pasangan calon</p>
+        <h1 class="mt-2 text-3xl font-black">Kategori {{ $session['kategori'] === 'L' ? 'Putra' : 'Putri' }}</h1>
+        <div class="mt-8 grid gap-5 md:grid-cols-2">
+            @forelse($pasangan as $item)
+                <article class="overflow-hidden rounded-2xl border border-slate-200 p-5">
+                    @if ($item->photoUrl())
+                        <img src="{{ $item->photoUrl() }}" class="mb-4 h-48 w-full rounded-xl object-contain"
+                            alt="Foto pasangan nomor {{ $item->nomor_urut }}">
+                    @endif
+                    <span class="rounded-full bg-emerald-100 px-3 py-1 text-sm font-black text-emerald-800">
+                        No. {{ $item->nomor_urut }}</span>
+                    <h2 class="mt-4 text-xl font-black">Pasangan {{ $item->nomor_urut }}</h2>
+                    <p class="mt-2 text-slate-600">Visi: {{ $item->visi ?: 'Belum tersedia' }}</p>
+                    <form class="mt-5" method="POST" action="{{ route('pilketos.confirm') }}">@csrf<input
+                            type="hidden" name="pasangan_id" value="{{ $item->id }}"><button
+                            class="rounded-xl bg-slate-900 px-4 py-2 font-bold text-white">Pilih pasangan ini</button>
+                    </form>
+            </article>@empty<p class="text-slate-600">Belum ada pasangan aktif.</p>
+            @endforelse
+        </div>
+    </div>
 </x-pilketos.public.layout>
