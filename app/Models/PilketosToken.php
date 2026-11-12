@@ -15,4 +15,12 @@ class PilketosToken extends Model
     {
         return $this->belongsTo(PilketosPeriode::class, 'periode_id');
     }
+
+    protected function casts(): array
+    {
+        return [
+            'token_encrypted' => 'encrypted',
+            'used_at' => 'datetime',
+        ];
+    }
 }

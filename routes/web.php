@@ -7,6 +7,7 @@ use App\Http\Controllers\Pilketos\PengaturanController;
 use App\Http\Controllers\Pilketos\PresignPasanganPhotoController;
 use App\Http\Controllers\Pilketos\PublicVotingController;
 use App\Http\Controllers\Pilketos\TokenController;
+use App\Http\Controllers\Pilketos\TokenReportController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
@@ -16,11 +17,12 @@ Route::get('/health', function () {
 
 // Routes untuk OSIS Voting - Landing Page
 Volt::route('/', 'pages.pilketos.landing')->name('pilketos.landing');
+Volt::route('/masukkan-token', 'pages.pilketos.enter-token')->middleware('cache.headers:private;no_store')->name('pilketos.enter-token');
 Route::post('/verifikasi-token', [PublicVotingController::class, 'verify'])->middleware('throttle:pilketos-token')->name('pilketos.verify');
-Volt::route('/voting', 'pages.pilketos.vote')->name('pilketos.vote');
-Volt::route('/voting/konfirmasi', 'pages.pilketos.confirm')->name('pilketos.confirm');
+Volt::route('/voting', 'pages.pilketos.vote')->middleware('cache.headers:private;no_store')->name('pilketos.vote');
+Volt::route('/voting/konfirmasi', 'pages.pilketos.confirm')->middleware('cache.headers:private;no_store')->name('pilketos.confirm');
 Route::post('/voting/kirim', [PublicVotingController::class, 'submit'])->name('pilketos.submit');
-Volt::route('/voting/selesai', 'pages.pilketos.done')->name('pilketos.done');
+Volt::route('/voting/selesai', 'pages.pilketos.done')->middleware('cache.headers:private;no_store')->name('pilketos.done');
 Volt::route('/hasil', 'pages.pilketos.public-results')->name('pilketos.hasil.public');
 
 // Routes untuk Guru Login dan Dashboard
@@ -42,6 +44,8 @@ Route::middleware('auth:web')->group(function () {
     Volt::route('/dashboard/token', 'pages.pilketos.tokens')->name('pilketos.token.index');
     Route::post('/dashboard/token', [TokenController::class, 'generate'])->name('pilketos.token.generate');
     Route::post('/dashboard/token/{token}/replace', [TokenController::class, 'replace'])->name('pilketos.token.replace');
+    Route::get('/dashboard/token/print', [TokenReportController::class, 'print'])->name('pilketos.token.print');
+    Route::get('/dashboard/token/export', [TokenReportController::class, 'export'])->name('pilketos.token.export');
     Volt::route('/dashboard/pemilih', 'pages.pilketos.voters')->name('pilketos.pemilih.index');
     Volt::route('/dashboard/hasil', 'pages.pilketos.results')->name('pilketos.hasil.index');
     Route::get('/dashboard/hasil/{periode}/pdf', [HasilController::class, 'pdf'])->name('pilketos.hasil.pdf');

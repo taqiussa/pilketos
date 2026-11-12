@@ -1,5 +1,6 @@
 <?php
 
+use App\Exports\PilketosTokenKelasExport;
 use App\Http\Controllers\Pilketos\HasilController;
 use App\Models\PilketosAuditLog;
 use App\Models\PilketosHakPilih;
@@ -10,6 +11,7 @@ use App\Models\PilketosToken;
 use App\Models\User;
 use App\Services\PilketosCandidateService;
 use App\Services\PilketosStudentDirectory;
+use App\Services\PilketosTokenClassReportService;
 use App\Services\PilketosTokenService;
 use App\Services\PilketosVotingService;
 use Illuminate\Database\Schema\Blueprint;
@@ -105,7 +107,15 @@ it('landing menggunakan fallback judul dan deskripsi saat pengaturan kosong', fu
 it('voting page dapat diakses', function () {
     $response = $this->get('/voting');
 
-    $response->assertRedirect(route('pilketos.landing'));
+    $response->assertRedirect(route('pilketos.enter-token'));
+});
+
+it('halaman masukkan token dapat diakses publik', function (): void {
+    PilketosPeriode::query()->create(['tahun' => '2026 / 2027', 'nama' => 'PILKETOS', 'status' => 'aktif']);
+
+    $this->get(route('pilketos.enter-token'))->assertSuccessful()
+        ->assertSee('Masukkan Token Voting')
+        ->assertSee('Mulai Memilih');
 });
 
 it('siswa dapat melakukan voting dengan token yang valid', function (): void {
@@ -166,7 +176,94 @@ it('token yang belum digunakan dapat diganti tanpa memberi hak pilih kedua', fun
     expect($replacement)->toHaveLength(6)
         ->and($replacement)->not->toBe('ABC123')
         ->and(PilketosToken::query()->where('periode_id', $periode->id)->where('nis', 100001)->count())->toBe(1)
+        ->and(PilketosToken::query()->findOrFail($token->id)->token_encrypted)->toBe($replacement)
         ->and(PilketosAuditLog::query()->where('event', 'token_diganti')->count())->toBe(1);
+});
+
+it('voting menampilkan identitas kandidat dari user siswa pada tahun periode', function (): void {
+    ($this->createEligibleStudent)(100001, 'L');
+    ($this->createEligibleStudent)(100002, 'L');
+    \Illuminate\Support\Facades\DB::table('user_siswa')->where('nis', 100001)->update(['name' => 'Ketua Uji']);
+    \Illuminate\Support\Facades\DB::table('user_siswa')->where('nis', 100002)->update(['name' => 'Wakil Uji']);
+    $periode = PilketosPeriode::query()->create(['tahun' => '2026 / 2027', 'nama' => 'PILKETOS', 'status' => 'aktif']);
+    $token = PilketosToken::query()->create(['periode_id' => $periode->id, 'nis' => 100001, 'kelas_id' => 1, 'token_hash' => app(PilketosTokenService::class)->hash('ABC123'), 'status' => 'tersedia']);
+    PilketosHakPilih::query()->create(['periode_id' => $periode->id, 'nis' => 100001, 'kategori' => 'L']);
+    PilketosPasangan::query()->create(['periode_id' => $periode->id, 'kategori' => 'L', 'nomor_urut' => 1, 'ketua_nis' => 100001, 'wakil_nis' => 100002, 'visi' => 'Visi uji', 'misi' => 'Misi uji', 'is_active' => true]);
+    PilketosPasangan::query()->create(['periode_id' => $periode->id, 'kategori' => 'P', 'nomor_urut' => 2, 'ketua_nis' => 100001, 'wakil_nis' => 100002, 'visi' => 'Tidak boleh terlihat', 'is_active' => true]);
+
+    $this->withSession(['pilketos.vote' => ['token_id' => $token->id, 'kategori' => 'L', 'nonce' => 'nonce']])
+        ->get(route('pilketos.vote'))->assertSuccessful()
+        ->assertSee('Ketua Uji')->assertSee('Wakil Uji')->assertSee('Kelas 8 A')
+        ->assertSee('Visi uji')->assertSee('Misi uji')->assertDontSee('Tidak boleh terlihat');
+});
+
+it('halaman token tidak menampilkan siswa sebelum kedua filter dipilih', function (): void {
+    ($this->createEligibleStudent)();
+    PilketosPeriode::query()->create(['tahun' => '2026 / 2027', 'nama' => 'PILKETOS', 'status' => 'draft']);
+
+    $this->actingAs(User::factory()->create())->get(route('pilketos.token.index'))
+        ->assertSuccessful()
+        ->assertSee('Pilih Tahun Akademik')
+        ->assertSee('Pilih Kelas')
+        ->assertSee('Silakan pilih tahun akademik dan kelas')
+        ->assertDontSee('Siswa Uji');
+});
+
+it('laporan token kelas hanya memuat siswa pada tahun dan kelas yang dipilih', function (): void {
+    ($this->createEligibleStudent)(100001, 'L');
+    \Illuminate\Support\Facades\DB::table('kelas')->insert(['id' => 2, 'tingkat' => 8, 'nama' => 'B']);
+    \Illuminate\Support\Facades\DB::table('user_siswa')->insert(['nis' => 100002, 'name' => 'Siswa Kelas Lain']);
+    \Illuminate\Support\Facades\DB::table('siswas')->insert(['nis' => 100002, 'kelas_id' => 2, 'tahun' => '2026 / 2027']);
+    \Illuminate\Support\Facades\DB::table('biodata')->insert(['nis' => 100002, 'jenis_kelamin' => 'P']);
+    \Illuminate\Support\Facades\DB::table('user_siswa')->insert(['nis' => 100003, 'name' => 'Siswa Tahun Lain']);
+    \Illuminate\Support\Facades\DB::table('siswas')->insert(['nis' => 100003, 'kelas_id' => 1, 'tahun' => '2025 / 2026']);
+    \Illuminate\Support\Facades\DB::table('biodata')->insert(['nis' => 100003, 'jenis_kelamin' => 'L']);
+    $periode = PilketosPeriode::query()->create(['tahun' => '2026 / 2027', 'nama' => 'PILKETOS', 'status' => 'draft']);
+
+    $report = app(PilketosTokenClassReportService::class)->forClass($periode->id, 1);
+
+    expect($report['rows'])->toHaveCount(1)
+        ->and($report['rows'][0])->toMatchArray(['name' => 'Siswa Uji', 'kelas' => '8 A', 'token_label' => '-']);
+});
+
+it('token baru disimpan terenkripsi dan dapat dipulihkan untuk laporan', function (): void {
+    ($this->createEligibleStudent)();
+    $periode = PilketosPeriode::query()->create(['tahun' => '2026 / 2027', 'nama' => 'PILKETOS', 'status' => 'draft']);
+
+    $generated = app(PilketosTokenService::class)->generateForClass($periode, 1, 1);
+    $token = PilketosToken::query()->firstOrFail();
+    $report = app(PilketosTokenClassReportService::class)->forClass($periode->id, 1);
+
+    expect($token->token_hash)->not->toBe($generated[0]['token'])
+        ->and($token->getRawOriginal('token_encrypted'))->not->toBe($generated[0]['token'])
+        ->and($report['rows'][0]['token'])->toBe($generated[0]['token']);
+});
+
+it('token lama tanpa nilai terenkripsi tidak menghasilkan plaintext palsu', function (): void {
+    ($this->createEligibleStudent)();
+    $periode = PilketosPeriode::query()->create(['tahun' => '2026 / 2027', 'nama' => 'PILKETOS', 'status' => 'draft']);
+    PilketosToken::query()->create(['periode_id' => $periode->id, 'nis' => 100001, 'kelas_id' => 1, 'token_hash' => app(PilketosTokenService::class)->hash('ABC123'), 'status' => 'tersedia']);
+
+    $report = app(PilketosTokenClassReportService::class)->forClass($periode->id, 1);
+
+    expect($report['rows'][0]['token'])->toBeNull()->and($report['rows'][0]['token_label'])->toBe('Token lama tidak tersedia');
+});
+
+it('print dan export token dibatasi pada kelas yang dipilih', function (): void {
+    ($this->createEligibleStudent)();
+    $periode = PilketosPeriode::query()->create(['tahun' => '2026 / 2027', 'nama' => 'PILKETOS', 'status' => 'draft']);
+    app(PilketosTokenService::class)->generateForClass($periode, 1, 1);
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->get(route('pilketos.token.print', ['periode' => $periode->id, 'kelas' => 1]))
+        ->assertSuccessful()->assertSee('Siswa Uji')->assertSee('DAFTAR TOKEN PEMILIHAN KETUA OSIS')
+        ->assertHeaderContains('cache-control', 'private')
+        ->assertHeaderContains('cache-control', 'no-store');
+    $this->actingAs($user)->get(route('pilketos.token.export', ['periode' => $periode->id, 'kelas' => 1]))
+        ->assertSuccessful()->assertHeaderContains('cache-control', 'private')
+        ->assertHeaderContains('cache-control', 'no-store');
+    expect((new PilketosTokenKelasExport(app(PilketosTokenClassReportService::class)->forClass($periode->id, 1)['rows']))->headings())
+        ->toBe(['No', 'Nama Siswa', 'Kelas', 'Token']);
 });
 
 it('pembaruan kandidat menolak siswa yang sudah menjadi kandidat lain', function (): void {

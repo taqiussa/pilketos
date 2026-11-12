@@ -5,13 +5,10 @@ namespace App\Http\Controllers\Pilketos;
 use App\Http\Controllers\Controller;
 use App\Models\PilketosPasangan;
 use App\Models\PilketosPeriode;
-use App\Models\PilketosToken;
-use App\Services\PilketosStudentDirectory;
-use App\Services\PilketosTokenService;
+use App\Services\PilketosTokenVerificationService;
 use App\Services\PilketosVotingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\View\View;
 
 class PublicVotingController extends Controller
@@ -23,35 +20,14 @@ class PublicVotingController extends Controller
         return view('pilketos.public.landing', compact('periode'));
     }
 
-    public function verify(Request $request, PilketosTokenService $tokens, PilketosStudentDirectory $students, PilketosVotingService $voting): RedirectResponse
+    public function verify(Request $request, PilketosTokenVerificationService $verification): RedirectResponse
     {
         $request->validate(['token' => ['required', 'string', 'size:6']]);
-        $key = 'pilketos-failed-token:'.$request->ip().'|'.$request->session()->getId();
-        if (RateLimiter::tooManyAttempts($key, 5)) {
-            return back()->withErrors(['token' => 'Coba kembali beberapa saat lagi.']);
-        }
-        $plain = $tokens->normalize($request->string('token')->toString());
-        if (! $tokens->isValidFormat($plain)) {
-            RateLimiter::hit($key, 120);
-
-            return back()->withErrors(['token' => 'Token tidak dapat diverifikasi.']);
-        }
-        $token = PilketosToken::query()->with('periode')->where('token_hash', $tokens->hash($plain))->first();
-        if ($token === null || $token->status !== 'tersedia' || ! $voting->isOpen($token->periode)) {
-            RateLimiter::hit($key, 120);
-
-            return back()->withErrors(['token' => 'Token tidak dapat diverifikasi.']);
-        }
         try {
-            $student = $students->eligibleStudent((int) $token->nis, $token->periode->tahun);
-        } catch (\Throwable) {
-            RateLimiter::hit($key, 120);
-
-            return back()->withErrors(['token' => 'Token tidak dapat diverifikasi.']);
+            $verification->verify($request->string('token')->toString(), $request->ip());
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            return back()->withErrors($exception->errors());
         }
-        RateLimiter::clear($key);
-        $request->session()->regenerate();
-        $request->session()->put('pilketos.vote', ['token_id' => $token->id, 'kategori' => $student['kategori'], 'nonce' => str()->random(40)]);
 
         return redirect()->route('pilketos.vote');
     }

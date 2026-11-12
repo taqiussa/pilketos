@@ -6,7 +6,6 @@ use App\Models\PilketosAuditLog;
 use App\Models\PilketosHakPilih;
 use App\Models\PilketosPeriode;
 use App\Models\PilketosToken;
-use App\Models\Siswa;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -38,12 +37,14 @@ class PilketosTokenService
     /** @return array<int, array{nis: int, name: string, kelas: string, token: string}> */
     public function generateForClass(PilketosPeriode $periode, int $kelasId, ?int $actorId): array
     {
-        $rows = Siswa::query()->where('tahun', $periode->tahun)->where('kelas_id', $kelasId)->orderBy('nis')->get()->unique('nis');
+        $rows = $this->students->studentsForClass($periode->tahun, $kelasId);
         $printed = [];
 
         DB::transaction(function () use ($rows, $periode, $kelasId, $actorId, &$printed): void {
-            foreach ($rows as $row) {
-                $student = $this->students->eligibleStudent((int) $row->nis, $periode->tahun);
+            foreach ($rows as $student) {
+                if (! in_array($student['kategori'], ['L', 'P'], true)) {
+                    throw new RuntimeException('Siswa tidak memenuhi syarat pada periode ini.');
+                }
                 $exists = PilketosToken::query()->where('periode_id', $periode->id)->where('nis', $student['nis'])->lockForUpdate()->exists();
                 if ($exists) {
                     continue;
@@ -77,7 +78,11 @@ class PilketosTokenService
             for ($attempt = 0; $attempt < config('pilketos.max_token_attempts'); $attempt++) {
                 $plain = $this->randomToken();
                 try {
-                    $token->update(['token_hash' => $this->hash($plain), 'generated_by' => $actorId]);
+                    $token->update([
+                        'token_hash' => $this->hash($plain),
+                        'token_encrypted' => $plain,
+                        'generated_by' => $actorId,
+                    ]);
                     PilketosAuditLog::query()->create([
                         'periode_id' => $token->periode_id,
                         'nis' => $token->nis,
@@ -103,7 +108,15 @@ class PilketosTokenService
         for ($attempt = 0; $attempt < config('pilketos.max_token_attempts'); $attempt++) {
             $plain = $this->randomToken();
             try {
-                PilketosToken::query()->create(['periode_id' => $periodeId, 'nis' => $nis, 'kelas_id' => $kelasId, 'token_hash' => $this->hash($plain), 'status' => 'tersedia', 'generated_by' => $actorId]);
+                PilketosToken::query()->create([
+                    'periode_id' => $periodeId,
+                    'nis' => $nis,
+                    'kelas_id' => $kelasId,
+                    'token_hash' => $this->hash($plain),
+                    'token_encrypted' => $plain,
+                    'status' => 'tersedia',
+                    'generated_by' => $actorId,
+                ]);
 
                 return $plain;
             } catch (QueryException $exception) {

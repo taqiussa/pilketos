@@ -27,27 +27,19 @@ class TokenController extends Controller
     {
         $data = $request->validate(['periode_id' => ['required', 'exists:pilketos_periodes,id'], 'kelas_id' => ['required', 'exists:kelas,id']]);
         $periode = PilketosPeriode::query()->findOrFail($data['periode_id']);
-        $print = $tokens->generateForClass($periode, (int) $data['kelas_id'], $request->user()->id);
-        $request->session()->flash('pilketos.tokens.print', $print);
+        $created = $tokens->generateForClass($periode, (int) $data['kelas_id'], $request->user()->id);
 
-        return redirect()->route('pilketos.token.index', ['periode' => $periode->id])->with('success', count($print).' token baru dibuat. Cetak sekarang; token plaintext tidak disimpan.');
+        return redirect()->route('pilketos.token.index')->with('success', count($created).' token baru dibuat. Pilih periode dan kelas untuk mencetak atau mengekspor token.');
     }
 
     public function replace(PilketosToken $token, PilketosTokenService $tokens): RedirectResponse
     {
         try {
-            $plain = $tokens->replaceUnusedToken($token->id, request()->user()?->id);
+            $tokens->replaceUnusedToken($token->id, request()->user()?->id);
         } catch (\RuntimeException $exception) {
             return back()->withErrors(['token' => $exception->getMessage()]);
         }
 
-        request()->session()->flash('pilketos.tokens.print', [[
-            'nis' => $token->nis,
-            'name' => 'Token pengganti',
-            'kelas' => 'Distribusikan langsung kepada siswa',
-            'token' => $plain,
-        ]]);
-
-        return redirect()->route('pilketos.token.index', ['periode' => $token->periode_id])->with('success', 'Token pengganti dibuat. Cetak atau distribusikan sekarang; plaintext tidak disimpan.');
+        return redirect()->route('pilketos.token.index')->with('success', 'Token pengganti dibuat. Pilih periode dan kelas untuk mencetak atau mengekspor token.');
     }
 }
