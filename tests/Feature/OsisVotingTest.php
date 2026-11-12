@@ -7,6 +7,7 @@ use App\Models\PilketosPasangan;
 use App\Models\PilketosPeriode;
 use App\Models\PilketosSuara;
 use App\Models\PilketosToken;
+use App\Models\User;
 use App\Services\PilketosCandidateService;
 use App\Services\PilketosStudentDirectory;
 use App\Services\PilketosTokenService;
@@ -14,12 +15,22 @@ use App\Services\PilketosVotingService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->withoutVite();
+    Schema::create('users', function (Blueprint $table): void {
+        $table->id();
+        $table->string('name');
+        $table->string('email')->unique();
+        $table->timestamp('email_verified_at')->nullable();
+        $table->string('password');
+        $table->rememberToken();
+        $table->timestamps();
+    });
     Schema::create('kelas', function (Blueprint $table): void {
         $table->id();
         $table->unsignedTinyInteger('tingkat');
@@ -53,6 +64,42 @@ it('landing page osis dapat diakses', function () {
 
     $response->assertStatus(200);
     $response->assertSee('SMP Al Musyaffa');
+});
+
+it('landing menampilkan pengaturan periode aktif dan asetnya', function (): void {
+    Storage::fake('s3');
+    $periode = PilketosPeriode::query()->create([
+        'tahun' => '2026 / 2027', 'nama' => 'PILKETOS 2026', 'status' => 'aktif',
+        'judul_landing' => 'Pilih Pemimpin Masa Depan',
+        'deskripsi_landing' => 'Suaramu menentukan arah organisasi siswa.',
+        'logo_path' => 'pilketos/landing/logo.png', 'banner_path' => 'pilketos/landing/banner.png',
+    ]);
+
+    $logoUrl = Storage::disk(config('pilketos.photo_disk'))->url($periode->logo_path);
+    $bannerUrl = Storage::disk(config('pilketos.photo_disk'))->url($periode->banner_path);
+
+    $this->get(route('pilketos.landing'))->assertSuccessful()
+        ->assertSee($periode->judul_landing)
+        ->assertSee($periode->deskripsi_landing)
+        ->assertSee('Tahun akademik 2026 / 2027')
+        ->assertSee($logoUrl)
+        ->assertSee($bannerUrl);
+});
+
+it('landing menyediakan fallback dan menonaktifkan voting tanpa periode aktif', function (): void {
+    $this->get(route('pilketos.landing'))->assertSuccessful()
+        ->assertSee('Pemilihan Ketua OSIS')
+        ->assertSee('Belum ada periode aktif')
+        ->assertSee('disabled', false);
+});
+
+it('landing menggunakan fallback judul dan deskripsi saat pengaturan kosong', function (): void {
+    PilketosPeriode::query()->create(['tahun' => '2026 / 2027', 'nama' => 'Pemilihan OSIS 2026', 'status' => 'aktif']);
+
+    $this->get(route('pilketos.landing'))->assertSuccessful()
+        ->assertSee('Pemilihan OSIS 2026')
+        ->assertSee('Gunakan hak pilihmu secara aman')
+        ->assertDontSee('src=""', false);
 });
 
 it('voting page dapat diakses', function () {
@@ -146,6 +193,27 @@ it('direktori kandidat hanya mengembalikan siswa pada tahun dan jenis kelamin ya
 
     expect($students)->toHaveCount(1)
         ->and($students[0])->toMatchArray(['nis' => 100001, 'name' => 'Siswa Uji', 'kelas' => '8 A', 'kategori' => 'L']);
+});
+
+it('halaman kandidat menampilkan identitas siswa dari periode yang dipilih', function (): void {
+    ($this->createEligibleStudent)(100001, 'L');
+    ($this->createEligibleStudent)(100002, 'L');
+    $periode = PilketosPeriode::query()->create(['tahun' => '2026 / 2027', 'nama' => 'PILKETOS', 'status' => 'draft']);
+    PilketosPasangan::query()->create([
+        'periode_id' => $periode->id,
+        'kategori' => 'L',
+        'nomor_urut' => 1,
+        'ketua_nis' => 100001,
+        'wakil_nis' => 100002,
+    ]);
+
+    $this->actingAs(User::factory()->create())
+        ->get(route('pilketos.kandidat.index'))
+        ->assertSuccessful()
+        ->assertSee('Siswa Uji')
+        ->assertSee('8 A')
+        ->assertSee('100001')
+        ->assertSee('100002');
 });
 
 it('validasi kandidat menolak siswa dari jenis kelamin atau tahun yang berbeda', function (): void {
