@@ -41,6 +41,7 @@ class User extends Authenticatable
         return [
             'is_active' => 'boolean',
             'password' => 'hashed',
+            'token_encrypted' => 'encrypted',
         ];
     }
 

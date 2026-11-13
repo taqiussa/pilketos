@@ -86,6 +86,15 @@ it('skips unknown gender and generates teacher token idempotently', function ():
     expect(PilketosToken::query()->where('user_id', $eligible->id)->where('voter_type', 'guru')->count())->toBe(1);
 });
 
+it('uses the same six character alphabet for teacher tokens', function (): void {
+    $teacher = teacher(['jenis_kelamin' => 'L']);
+    $periode = PilketosPeriode::query()->create(['tahun' => '2026 / 2027', 'nama' => 'PILKETOS', 'status' => 'aktif']);
+    app(PilketosTokenService::class)->generateForTeachers($periode, null);
+    $token = PilketosToken::query()->where('user_id', $teacher->id)->firstOrFail();
+
+    expect($token->token_encrypted)->toMatch('/^[ABCDEFGHJKLMNPQRSTUVWXYZ123456789]{6}$/');
+});
+
 it('verifies a teacher token without storing teacher identity in the voting session', function (): void {
     $teacher = teacher(['jenis_kelamin' => 'P']);
     $periode = PilketosPeriode::query()->create(['tahun' => '2026 / 2027', 'nama' => 'PILKETOS', 'status' => 'aktif']);
