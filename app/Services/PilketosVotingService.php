@@ -25,7 +25,11 @@ class PilketosVotingService
                 $this->reject();
             }
 
-            $hakPilih = PilketosHakPilih::query()->where('periode_id', $periode->id)->where('nis', $token->nis)->lockForUpdate()->first();
+            $hakPilih = PilketosHakPilih::query()
+                ->where('periode_id', $periode->id)
+                ->when($token->voter_type === 'guru', fn ($query) => $query->where('user_id', $token->user_id), fn ($query) => $query->where('nis', $token->nis))
+                ->lockForUpdate()
+                ->first();
             if ($hakPilih === null || $hakPilih->status !== 'belum_memilih') {
                 $this->reject();
             }

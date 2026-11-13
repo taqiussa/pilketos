@@ -12,7 +12,7 @@ use RuntimeException;
 
 class PilketosTokenService
 {
-    public function __construct(private PilketosStudentDirectory $students) {}
+    public function __construct(private PilketosStudentDirectory $students, private PilketosTeacherDirectory $teachers) {}
 
     public function hash(string $token): string
     {
@@ -62,13 +62,41 @@ class PilketosTokenService
         return $printed;
     }
 
+    /** @return array{created:int, skipped:int} */
+    public function generateForTeachers(PilketosPeriode $periode, ?int $actorId): array
+    {
+        $created = 0;
+        $skipped = 0;
+
+        DB::transaction(function () use ($periode, $actorId, &$created, &$skipped): void {
+            $this->teachers->eligibleQuery()->orderBy('id')->each(function ($user) use ($periode, $actorId, &$created, &$skipped): void {
+                $kategori = $this->teachers->normalizeGender($user->jenis_kelamin);
+                if ($kategori === null) {
+                    $skipped++;
+
+                    return;
+                }
+
+                $exists = PilketosToken::query()->where('periode_id', $periode->id)->where('user_id', $user->id)->lockForUpdate()->exists();
+                if ($exists) {
+                    return;
+                }
+
+                $this->createTeacherToken($periode->id, $user->id, $kategori, $actorId);
+                $created++;
+            });
+        }, 3);
+
+        return compact('created', 'skipped');
+    }
+
     public function replaceUnusedToken(int $tokenId, ?int $actorId): string
     {
         return DB::transaction(function () use ($tokenId, $actorId): string {
             $token = PilketosToken::query()->lockForUpdate()->findOrFail($tokenId);
             $hakPilih = PilketosHakPilih::query()
                 ->where('periode_id', $token->periode_id)
-                ->where('nis', $token->nis)
+                ->when($token->voter_type === 'guru', fn ($query) => $query->where('user_id', $token->user_id), fn ($query) => $query->where('nis', $token->nis))
                 ->lockForUpdate()
                 ->first();
             if ($token->status !== 'tersedia' || $hakPilih === null || $hakPilih->status !== 'belum_memilih') {
@@ -86,6 +114,8 @@ class PilketosTokenService
                     PilketosAuditLog::query()->create([
                         'periode_id' => $token->periode_id,
                         'nis' => $token->nis,
+                        'user_id' => $token->user_id,
+                        'voter_type' => $token->voter_type,
                         'actor_id' => $actorId,
                         'event' => 'token_diganti',
                         'context' => ['token_id' => $token->id],
@@ -110,6 +140,7 @@ class PilketosTokenService
             try {
                 PilketosToken::query()->create([
                     'periode_id' => $periodeId,
+                    'voter_type' => 'siswa',
                     'nis' => $nis,
                     'kelas_id' => $kelasId,
                     'token_hash' => $this->hash($plain),
@@ -125,6 +156,37 @@ class PilketosTokenService
                 }
             }
         }
+        throw new RuntimeException('Token aman tidak dapat dibuat. Coba lagi.');
+    }
+
+    private function createTeacherToken(int $periodeId, int $userId, string $kategori, ?int $actorId): string
+    {
+        for ($attempt = 0; $attempt < config('pilketos.max_token_attempts'); $attempt++) {
+            $plain = $this->randomToken();
+            try {
+                PilketosToken::query()->create([
+                    'periode_id' => $periodeId,
+                    'voter_type' => 'guru',
+                    'user_id' => $userId,
+                    'kelas_id' => null,
+                    'token_hash' => $this->hash($plain),
+                    'token_encrypted' => $plain,
+                    'status' => 'tersedia',
+                    'generated_by' => $actorId,
+                ]);
+                PilketosHakPilih::query()->firstOrCreate(
+                    ['periode_id' => $periodeId, 'user_id' => $userId],
+                    ['voter_type' => 'guru', 'kategori' => $kategori, 'status' => 'belum_memilih'],
+                );
+
+                return $plain;
+            } catch (QueryException $exception) {
+                if (! $this->isUniqueViolation($exception)) {
+                    throw $exception;
+                }
+            }
+        }
+
         throw new RuntimeException('Token aman tidak dapat dibuat. Coba lagi.');
     }
 

@@ -12,6 +12,7 @@ class PilketosTokenVerificationService
     public function __construct(
         private PilketosTokenService $tokens,
         private PilketosStudentDirectory $students,
+        private PilketosTeacherDirectory $teachers,
         private PilketosVotingService $voting,
     ) {}
 
@@ -34,7 +35,9 @@ class PilketosTokenVerificationService
         }
 
         try {
-            $student = $this->students->eligibleStudent((int) $token->nis, $token->periode->tahun);
+            $voter = $token->voter_type === 'guru'
+                ? $this->teachers->eligibleTeacher((int) $token->user_id)
+                : $this->students->eligibleStudent((int) $token->nis, $token->periode->tahun);
         } catch (\Throwable) {
             RateLimiter::hit($key, 120);
             throw ValidationException::withMessages(['token' => 'Token tidak dapat diverifikasi.']);
@@ -44,7 +47,8 @@ class PilketosTokenVerificationService
         Session::regenerate();
         Session::put('pilketos.vote', [
             'token_id' => $token->id,
-            'kategori' => $student['kategori'],
+            'voter_type' => $token->voter_type,
+            'kategori' => $voter['kategori'],
             'nonce' => str()->random(40),
         ]);
     }

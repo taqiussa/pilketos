@@ -1,0 +1,19 @@
+<?php
+
+use App\Models\PilketosHakPilih;
+use App\Models\PilketosPeriode;
+use App\Services\PilketosTeacherDirectory;
+use Livewire\Attributes\Layout;
+use Livewire\WithPagination;
+use Livewire\Volt\Component;
+
+new #[Layout('layouts.pilketos')] class extends Component {
+    use WithPagination;
+    public ?int $periodeId = null;
+    public string $status = '';
+    public string $search = '';
+    public function mount(): void { $this->periodeId = PilketosPeriode::query()->latest('tahun')->value('id'); }
+    public function updated($property): void { if (in_array($property, ['periodeId', 'status', 'search'], true)) $this->resetPage(); }
+    public function with(PilketosTeacherDirectory $teachers): array { $periode = $this->periodeId ? PilketosPeriode::query()->find($this->periodeId) : null; if (! $periode) return ['periodes' => PilketosPeriode::query()->latest('tahun')->get(), 'voters' => collect(), 'summary' => []]; $query = $teachers->eligibleQuery()->with('roles:id,name')->leftJoin('pilketos_hak_pilih as hp', fn ($join) => $join->on('hp.user_id','=','users.id')->where('hp.periode_id','=',$periode->id))->select('users.*','hp.status as voting_status','hp.voted_at')->when($this->search, fn ($q) => $q->where(fn ($q) => $q->where('users.name','like',"%{$this->search}%")->orWhere('users.username','like',"%{$this->search}%")))->when($this->status, fn ($q) => $this->status === 'belum_token' ? $q->whereNull('hp.id') : $q->where('hp.status',$this->status)); $eligible = (clone $query)->count(); $done = (clone $query)->where('hp.status','sudah_memilih')->count(); $noToken = (clone $query)->whereNull('hp.id')->count(); return ['periodes' => PilketosPeriode::query()->latest('tahun')->get(), 'voters' => $query->orderBy('users.name')->paginate(25), 'summary' => compact('eligible','done','noToken')]; }
+}; ?>
+<div><a wire:navigate href="{{ route('guru.dashboard') }}" class="font-bold text-emerald-700">← Dashboard</a><h1 class="mt-4 text-3xl font-black">Pemilih Guru</h1><div class="mt-5 flex flex-wrap gap-3 rounded-2xl bg-white p-4 shadow"><select wire:model.live="periodeId">@foreach($periodes as $item)<option value="{{ $item->id }}">{{ $item->tahun }}</option>@endforeach</select><select wire:model.live="status"><option value="">Semua status</option><option value="sudah_memilih">Sudah memilih</option><option value="belum_memilih">Belum memilih</option><option value="belum_token">Belum token</option></select><input wire:model.live.debounce.300ms="search" placeholder="Cari nama atau username"></div><div class="mt-5 grid gap-3 sm:grid-cols-3">@foreach(['Eligible'=>$summary['eligible'] ?? 0,'Sudah memilih'=>$summary['done'] ?? 0,'Belum token'=>$summary['noToken'] ?? 0] as $label=>$value)<article class="rounded-2xl bg-white p-4 shadow"><p>{{ $label }}</p><p class="text-3xl font-black">{{ $value }}</p></article>@endforeach</div><section class="mt-5 overflow-x-auto rounded-2xl bg-white shadow"><table class="min-w-full text-left text-sm"><thead class="sticky top-0 bg-slate-50"><tr><th class="p-3">Nama</th><th class="p-3">Username</th><th class="p-3">Role</th><th class="p-3">Gender</th><th class="p-3">Status</th><th class="p-3">Waktu voting</th></tr></thead><tbody>@forelse($voters as $voter)<tr class="border-t" wire:key="voter-{{ $voter->id }}"><td class="p-3">{{ $voter->name }}</td><td class="p-3">{{ $voter->username }}</td><td class="p-3">{{ $voter->roles->pluck('name')->join(', ') ?: '-' }}</td><td class="p-3">{{ $voter->jenis_kelamin }}</td><td class="p-3">{{ $voter->voting_status ?? 'belum_token' }}</td><td class="p-3">{{ $voter->voted_at }}</td></tr>@empty<tr><td colspan="6" class="p-6 text-center text-slate-500">Tidak ada guru eligible.</td></tr>@endforelse</tbody></table></section>@if($voters instanceof \Illuminate\Contracts\Pagination\Paginator){{ $voters->links() }}@endif</div>
